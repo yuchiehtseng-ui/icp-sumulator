@@ -3056,16 +3056,18 @@ async function sendToSheets() {
       emission_direct_modified:isDn && def.emission_direct!==undefined && inv.emission_direct!==def.emission_direct,
       // 上游專屬
       annual_qty: isUp ? inv.annual_qty : undefined,
-      suppliers:  isUp ? inv.suppliers  : undefined,
       annual_qty_modified: isUp && def.annual_qty !== undefined && inv.annual_qty !== def.annual_qty,
-      suppliers_modified: isUp ? (inv.suppliers||[]).map((s,si) => {
+      suppliers: isUp ? (inv.suppliers||[]).map((s,si) => {
         const ds = (def.suppliers||[])[si] || {};
         return {
-          name: s.name, unit_price: s.unit_price, co2_intensity: s.co2_intensity,
-          contract_years: s.contract_years, is_baseline: s.is_baseline,
-          unit_price_modified:    ds.unit_price    !== undefined && s.unit_price    !== ds.unit_price,
-          co2_intensity_modified: ds.co2_intensity !== undefined && s.co2_intensity !== ds.co2_intensity,
-          contract_years_modified:ds.contract_years!== undefined && s.contract_years!== ds.contract_years,
+          name: s.name,
+          unit_price: s.unit_price,
+          co2_intensity: s.co2_intensity,
+          contract_years: s.contract_years,
+          is_baseline: !!s.is_baseline,
+          unit_price_modified:     ds.unit_price    !== undefined && s.unit_price    !== ds.unit_price,
+          co2_intensity_modified:  ds.co2_intensity !== undefined && s.co2_intensity !== ds.co2_intensity,
+          contract_years_modified: ds.contract_years!== undefined && s.contract_years!== ds.contract_years,
         };
       }) : undefined,
       stable_price: sp, aggr_price: ap,
