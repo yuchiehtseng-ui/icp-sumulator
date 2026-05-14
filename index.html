@@ -2960,6 +2960,38 @@ async function sendToSheets() {
     '廠房 LED 照明全面汰換':   { cost:800000,  opex:10000,  years:10, co2:45,  benefit:165000 },
     '壓縮空氣系統節能改造':    { cost:1200000, opex:15000,  years:8,  co2:55,  benefit:200000 },
   };
+  const INV_DEFAULTS_downstream = {
+    '產品 A': { rd_cost:500000000, unit_price:1200000, unit_cost:850000,  annual_sales:8000, emission_gkm:165, annual_km:15000, emission_direct:0,   product_life:6 },
+    '產品 B': { rd_cost:300000000, unit_price:1500000, unit_cost:1100000, annual_sales:5000, emission_gkm:0,   annual_km:15000, emission_direct:2.1, product_life:6 },
+    '產品 C': { rd_cost:200000000, unit_price:1350000, unit_cost:980000,  annual_sales:4000, emission_gkm:55,  annual_km:15000, emission_direct:0,   product_life:6 },
+    '產品 D': { rd_cost:800000000, unit_price:1800000, unit_cost:1350000, annual_sales:1500, emission_gkm:0,   annual_km:20000, emission_direct:3.8, product_life:8 },
+    '產品 E': { rd_cost:150000000, unit_price:3500000, unit_cost:2200000, annual_sales:800,  emission_gkm:210, annual_km:12000, emission_direct:0,   product_life:5 },
+  };
+  // 上游：材料名稱 → { annual_qty, suppliers: [{name, unit_price, co2_intensity, contract_years}] }
+  const INV_DEFAULTS_upstream = {
+    '熱軋鋼捲':     { annual_qty:500, suppliers:[
+      { name:'現有供應商（傳統）',     unit_price:28000,  co2_intensity:2.1,  contract_years:3, is_baseline:true },
+      { name:'供應商 A（綠鋼認證）',   unit_price:32000,  co2_intensity:0.8,  contract_years:3 },
+      { name:'供應商 B（電弧爐製程）', unit_price:31000,  co2_intensity:1.1,  contract_years:2 },
+    ]},
+    '鋁合金壓鑄件': { annual_qty:120, suppliers:[
+      { name:'現有供應商（傳統）',     unit_price:72000,  co2_intensity:11.5, contract_years:3, is_baseline:true },
+      { name:'供應商 C（再生鋁 95%）', unit_price:81000,  co2_intensity:2.3,  contract_years:3 },
+    ]},
+    '保桿塑料件':   { annual_qty:80,  suppliers:[
+      { name:'現有供應商（傳統 PP）',  unit_price:45000,  co2_intensity:3.8,  contract_years:2, is_baseline:true },
+      { name:'供應商 D（生質塑料）',   unit_price:52000,  co2_intensity:1.2,  contract_years:2 },
+    ]},
+    '玻璃纖維複合材':{ annual_qty:40, suppliers:[
+      { name:'現有供應商（傳統）',     unit_price:95000,  co2_intensity:6.2,  contract_years:3, is_baseline:true },
+      { name:'供應商 E（低碳製程）',   unit_price:108000, co2_intensity:2.8,  contract_years:5 },
+      { name:'供應商 F（生物基複材）', unit_price:112000, co2_intensity:1.9,  contract_years:3 },
+    ]},
+    '電池陰極材料': { annual_qty:15,  suppliers:[
+      { name:'現有供應商（傳統礦源）', unit_price:380000, co2_intensity:18.5, contract_years:3, is_baseline:true },
+      { name:'供應商 G（低碳礦源）',   unit_price:420000, co2_intensity:6.2,  contract_years:3 },
+    ]},
+  };
 
   // ── 讀取 Step 02 決策門檻 ──
   const getVal = id => parseFloat(document.getElementById(id)?.value);
@@ -2986,21 +3018,56 @@ async function sendToSheets() {
   });
 
   // ── 投資方案（含預設值比對）──
-  const defaultsForTarget = INV_DEFAULTS_scope12;
+  const isDownstream = state.target === 'scope3_downstream';
+  const isUpstream   = state.target === 'scope3_upstream';
+  const defaultsForTarget = isDownstream ? INV_DEFAULTS_downstream
+                          : isUpstream   ? INV_DEFAULTS_upstream
+                          : INV_DEFAULTS_scope12;
   const rows = activeInvs.map(inv => {
     const ms = calcMetrics(inv, sp);
     const ma = calcMetrics(inv, ap);
-    const def = defaultsForTarget[inv.name] || {};
+    const defKey = isUpstream ? inv.material_name : inv.name;
+    const def = defaultsForTarget[defKey] || {};
+    const isDn = isDownstream;
+    const isUp = isUpstream;
     return {
-      name: inv.name, category: inv.category,
-      cost: inv.cost, benefit: inv.benefit, opex: inv.opex,
-      co2_annual: inv.co2, years: inv.years,
-      // 標記哪些欄位被修改過
-      cost_modified:    def.cost    !== undefined && inv.cost    !== def.cost,
-      benefit_modified: def.benefit !== undefined && inv.benefit !== def.benefit,
-      opex_modified:    def.opex    !== undefined && inv.opex    !== def.opex,
-      co2_modified:     def.co2     !== undefined && inv.co2     !== def.co2,
-      years_modified:   def.years   !== undefined && inv.years   !== def.years,
+      name: isUp ? inv.material_name : inv.name,
+      category: inv.category,
+      cost: isDn ? inv.rd_cost : inv.cost,
+      benefit: inv.benefit, opex: inv.opex,
+      co2_annual: inv.co2, years: isDn ? inv.product_life : inv.years,
+      // 下游專屬欄位
+      unit_price: inv.unit_price, unit_cost: inv.unit_cost,
+      annual_sales: inv.annual_sales, emission_gkm: inv.emission_gkm,
+      annual_km: inv.annual_km, emission_direct: inv.emission_direct,
+      // 標記修改過的欄位
+      cost_modified:           isDn ? (def.rd_cost    !== undefined && inv.rd_cost    !== def.rd_cost)
+                                    : (def.cost       !== undefined && inv.cost       !== def.cost),
+      benefit_modified:        def.benefit      !== undefined && inv.benefit      !== def.benefit,
+      opex_modified:           def.opex         !== undefined && inv.opex         !== def.opex,
+      co2_modified:            def.co2          !== undefined && inv.co2          !== def.co2,
+      years_modified:          isDn ? (def.product_life !== undefined && inv.product_life !== def.product_life)
+                                    : (def.years        !== undefined && inv.years        !== def.years),
+      unit_price_modified:     isDn && def.unit_price    !== undefined && inv.unit_price    !== def.unit_price,
+      unit_cost_modified:      isDn && def.unit_cost     !== undefined && inv.unit_cost     !== def.unit_cost,
+      annual_sales_modified:   isDn && def.annual_sales  !== undefined && inv.annual_sales  !== def.annual_sales,
+      emission_gkm_modified:   isDn && def.emission_gkm  !== undefined && inv.emission_gkm  !== def.emission_gkm,
+      annual_km_modified:      isDn && def.annual_km     !== undefined && inv.annual_km     !== def.annual_km,
+      emission_direct_modified:isDn && def.emission_direct!==undefined && inv.emission_direct!==def.emission_direct,
+      // 上游專屬
+      annual_qty: isUp ? inv.annual_qty : undefined,
+      suppliers:  isUp ? inv.suppliers  : undefined,
+      annual_qty_modified: isUp && def.annual_qty !== undefined && inv.annual_qty !== def.annual_qty,
+      suppliers_modified: isUp ? (inv.suppliers||[]).map((s,si) => {
+        const ds = (def.suppliers||[])[si] || {};
+        return {
+          name: s.name, unit_price: s.unit_price, co2_intensity: s.co2_intensity,
+          contract_years: s.contract_years, is_baseline: s.is_baseline,
+          unit_price_modified:    ds.unit_price    !== undefined && s.unit_price    !== ds.unit_price,
+          co2_intensity_modified: ds.co2_intensity !== undefined && s.co2_intensity !== ds.co2_intensity,
+          contract_years_modified:ds.contract_years!== undefined && s.contract_years!== ds.contract_years,
+        };
+      }) : undefined,
       stable_price: sp, aggr_price: ap,
       carbon_benefit_stable: ms.carbonBenefit, carbon_benefit_aggr: ma.carbonBenefit,
       payback_orig: ms.payback_orig, payback_stable: ms.payback_adj, payback_aggr: ma.payback_adj,
