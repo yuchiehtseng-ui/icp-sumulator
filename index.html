@@ -2923,24 +2923,24 @@ function buildResults() {
             </div>
           </div>
           <div class="res-metrics-wrap">${metricsHtml}</div>
-
         </div>
+        <div style="padding:0 4px 12px 4px;">${buildSingleChart(inv, sp, ap, payback_thresh)}</div>
       </div>`;
     });
   }
 
-
-  // ── 累積收益圖表 ──
-  if (!isUpstream) {
-    const chartHTML = buildCumulativeCharts(activeInvs, sp, ap, payback_thresh);
-    const chartContainer = document.getElementById('cumulativeCharts');
-    if (chartContainer) chartContainer.innerHTML = chartHTML;
-  }
+  // 清空舊的獨立圖表容器
+  const chartContainer = document.getElementById('cumulativeCharts');
+  if (chartContainer) chartContainer.innerHTML = '';
 
   document.getElementById('resultsTable').innerHTML = html || '<p style="padding:20px;color:#8ebd9d;">無符合條件的項目</p>';
 }
 
 function buildCumulativeCharts(invs, sp, ap, thresh) {
+  return invs.filter(i=>i.active).map(inv => buildSingleChart(inv, sp, ap, thresh)).join('');
+}
+
+function buildSingleChart(inv, sp, ap, thresh) {
   const W=560, H=190, L=52, R=24, T=14, B=28, PW=W-L-R, PH=H-T-B;
   const CO='#888780', CS='#1D9E75', CA='#BA7517';
 
@@ -2957,8 +2957,7 @@ function buildCumulativeCharts(invs, sp, ap, thresh) {
     return { pts, years };
   }
 
-  return invs.filter(i=>i.active).map(inv => {
-    const lines = [
+  const lines = [
       { color: CO, label: '原始',   line: makeLine(inv, 0) },
       { color: CS, label: '穩健',   line: makeLine(inv, sp) },
       { color: CA, label: '積極',   line: makeLine(inv, ap) },
@@ -3021,7 +3020,6 @@ function buildCumulativeCharts(invs, sp, ap, thresh) {
       <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">${cat}</div>
       ${svg}
     </div>`;
-  }).join('');
 }
 
 // ======= GOOGLE SHEETS =======
