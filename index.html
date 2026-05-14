@@ -1516,7 +1516,7 @@ select option { background: var(--surface2); }
     <button class="btn-secondary" onclick="goToSection(4)">← 返回調整</button>
     <button class="gs-btn" onclick="sendToSheets()">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg>
-      匯出至 Google Sheets
+      儲存結果
     </button>
     <button class="btn-secondary" onclick="window.print()">🖨️ 列印報告</button>
   </div>
@@ -3156,6 +3156,16 @@ async function sendToSheets() {
     });
   } else {
   rows = activeInvs.map(inv => {
+    // 下游：確保計算欄位已設定
+    if (isDownstream) {
+      const emTCO2 = inv.emission_mode === 'calc'
+        ? (inv.emission_gkm * (inv.annual_km || 15000)) / 1e6
+        : (inv.emission_direct || 0);
+      inv._emTCO2 = emTCO2;
+      inv.co2 = emTCO2 * inv.annual_sales;
+      inv.benefit = (inv.unit_price - inv.unit_cost) * inv.annual_sales;
+      inv.years = inv.product_life || inv.model_years || 6;
+    }
     const ms = calcMetrics(inv, sp);
     const ma = calcMetrics(inv, ap);
     const defKey = inv.name;
@@ -3190,7 +3200,19 @@ async function sendToSheets() {
       carbon_benefit_stable: ms.carbonBenefit, carbon_benefit_aggr: ma.carbonBenefit,
       payback_orig: ms.payback_orig, payback_stable: ms.payback_adj, payback_aggr: ma.payback_adj,
       npv_orig: ms.npv_orig, npv_stable: ms.npv_adj, npv_aggr: ma.npv_adj,
-      bcr_orig: ms.bcr_orig, bcr_stable: ms.bcr_adj, bcr_aggr: ma.bcr_adj,
+      bcr_orig: ms ? ms.bcr_orig : null,
+      bcr_stable: ms ? ms.bcr_adj : null,
+      bcr_aggr: ma ? ma.bcr_adj : null,
+      pass_stable: ms ? (
+        (!state.criteria.payback || (isFinite(ms.payback_adj) && ms.payback_adj <= payback_thresh)) &&
+        (!state.criteria.npv     || ms.npv_adj > 0) &&
+        (!state.criteria.bcr     || ms.bcr_adj >= bcr_thresh)
+      ) : false,
+      pass_aggr: ma ? (
+        (!state.criteria.payback || (isFinite(ma.payback_adj) && ma.payback_adj <= payback_thresh)) &&
+        (!state.criteria.npv     || ma.npv_adj > 0) &&
+        (!state.criteria.bcr     || ma.bcr_adj >= bcr_thresh)
+      ) : false,
     };
   });
   } // end else (non-upstream)
@@ -3200,7 +3222,7 @@ async function sendToSheets() {
 
   // ── Payload A：使用者選擇 Step 01-02 ──
   const choicesPayload = {
-    type: 'choices',
+    type: 'basic',
     timestamp: ts, user: userInfo,
     target: state.target, method: state.method,
     criteria: state.criteria,
@@ -3243,7 +3265,7 @@ async function sendToSheets() {
       <br><strong>設定方式：</strong>請將 Apps Script 的網路應用程式 URL 貼入程式碼中的 <code>SHEET_URL</code> 變數。
     `;
     btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg> 匯出至 Google Sheets`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg> 儲存結果`;
     return;
   }
 
@@ -3261,12 +3283,12 @@ async function sendToSheets() {
         console.error('Fetch error for type=' + p.type, fetchErr);
       }
     }
-    statusEl.innerHTML = `<strong style="color:#2d7a1a;">✓ 已成功送出！資料正在寫入 Google Sheets。</strong>`;
+    statusEl.innerHTML = `<strong style="color:#2d7a1a;">✓ 已成功儲存！</strong>`;
   } catch (e) {
     statusEl.innerHTML = `<strong style="color:var(--danger);">✗ 匯出失敗：</strong>${e.message}`;
   }
   btn.disabled = false;
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg> 匯出至 Google Sheets`;
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg> 儲存結果`;
 }
 
 
