@@ -2963,7 +2963,7 @@ async function sendToSheets() {
     investments: rows
   };
 
-  if (!SHEET_URL || SHEET_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+  if (!SHEET_URL || SHEET_URL === 'https://script.google.com/macros/s/AKfycbxR5Q0P1B4s6aEmD6Bz9F7Tt54AaNHilTxe1v9lGe4bm7JLxNLQz8x2EVYOFYxdvzrG/exec') {
     // Demo mode - show what would be sent
     statusEl.innerHTML = `
       <strong style="color:#1b475d;">✓ 模擬模式</strong>（尚未設定 Apps Script URL）<br>
@@ -3057,7 +3057,7 @@ function renderCustomRows(side) {
 
 
 // ===== LOGIN =====
-const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxR5Q0P1B4s6aEmD6Bz9F7Tt54AaNHilTxe1v9lGe4bm7JLxNLQz8x2EVYOFYxdvzrG/exec';
 let currentUser = null; // { email, inviteCode }
 
 async function doLogin() {
@@ -3085,7 +3085,7 @@ async function doLogin() {
   btn.textContent = '驗證中...';
 
   // Demo mode (no URL set)
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+  if (APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxR5Q0P1B4s6aEmD6Bz9F7Tt54AaNHilTxe1v9lGe4bm7JLxNLQz8x2EVYOFYxdvzrG/exec') {
     // Allow any input in demo mode
     currentUser = { email, inviteCode: code };
     onLoginSuccess();
