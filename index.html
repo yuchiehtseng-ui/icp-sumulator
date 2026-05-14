@@ -2941,7 +2941,7 @@ function buildCumulativeCharts(invs, sp, ap, thresh) {
 }
 
 function buildSingleChart(inv, sp, ap, thresh) {
-  const W=560, H=190, L=52, R=24, T=14, B=28, PW=W-L-R, PH=H-T-B;
+  const W=560, H=200, L=60, R=60, T=20, B=32, PW=W-L-R, PH=H-T-B;
   const CO='#888780', CS='#1D9E75', CA='#BA7517';
 
   function makeLine(inv, carbonPrice) {
@@ -2958,68 +2958,90 @@ function buildSingleChart(inv, sp, ap, thresh) {
   }
 
   const lines = [
-      { color: CO, label: '原始',   line: makeLine(inv, 0) },
-      { color: CS, label: '穩健',   line: makeLine(inv, sp) },
-      { color: CA, label: '積極',   line: makeLine(inv, ap) },
-    ].filter(l => l.line);
+    { color: CO, line: makeLine(inv, 0)  },
+    { color: CS, line: makeLine(inv, sp) },
+    { color: CA, line: makeLine(inv, ap) },
+  ].filter(l => l.line);
 
-    const allVals = lines.flatMap(l => l.line.pts.map(p => p.v));
-    const maxYears = Math.max(...lines.map(l => l.line.years));
-    const vMin = Math.min(...allVals) * 1.15;
-    const vMax = Math.max(...allVals) * 1.15;
-    const vRange = vMax - vMin || 1;
+  if (!lines.length) return '';
 
-    function xp(t) { return L + (t / maxYears) * PW; }
-    function yp(v) { return T + (1 - (v - vMin) / vRange) * PH; }
-    function fmt(v) { return (v >= 0 ? '+' : '') + Math.round(v / 10000) + '萬'; }
+  const allVals = lines.flatMap(l => l.line.pts.map(p => p.v));
+  const maxYears = Math.max(...lines.map(l => l.line.years));
+  const rawMin = Math.min(...allVals);
+  const rawMax = Math.max(...allVals);
+  // Always include 0 in range, and add 20% padding
+  const dataMin = Math.min(rawMin, 0);
+  const dataMax = Math.max(rawMax, 0);
+  const range = dataMax - dataMin || 1000000;
+  const pad = range * 0.2;
+  const vMin = dataMin - pad;
+  const vMax = dataMax + pad;
+  const vRange = vMax - vMin;
 
-    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
+  function xp(t) { return L + (t / maxYears) * PW; }
+  function yp(v) { return T + (1 - (v - vMin) / vRange) * PH; }
+  function fmt(v) { return (v >= 0 ? '+' : '') + Math.round(v / 10000) + '萬'; }
 
-    // Grid
-    for (let i = 0; i <= 4; i++) {
-      const v = vMin + (i / 4) * vRange;
-      const y = yp(v);
-      svg += `<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="rgba(128,128,128,0.12)" stroke-width="1"/>`;
-      svg += `<text x="${L-4}" y="${y+3}" font-size="9" text-anchor="end" fill="rgba(128,128,128,0.7)">${Math.round(v/10000)}萬</text>`;
-    }
-    // X labels
-    [0, Math.round(maxYears/2), maxYears].forEach(t => {
-      svg += `<text x="${xp(t)}" y="${H-6}" font-size="9" text-anchor="middle" fill="rgba(128,128,128,0.7)">${t}年</text>`;
-    });
-    // Zero line
-    const zy = yp(0);
-    svg += `<line x1="${L}" y1="${zy}" x2="${W-R}" y2="${zy}" stroke="rgba(128,128,128,0.3)" stroke-width="1"/>`;
-    // Threshold
-    if (thresh <= maxYears) {
-      const tx = xp(thresh);
-      svg += `<line x1="${tx}" y1="${T}" x2="${tx}" y2="${H-B}" stroke="#E24B4A" stroke-width="1.5" stroke-dasharray="5,4"/>`;
-      svg += `<text x="${tx+3}" y="${T+10}" font-size="9" fill="#E24B4A">門檻${thresh}年</text>`;
-    }
-    // Lines + payback dots
-    lines.forEach(({ color, line }) => {
-      const d = line.pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(p.t).toFixed(1)},${yp(p.v).toFixed(1)}`).join(' ');
-      svg += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
-      for (let i = 1; i < line.pts.length; i++) {
-        if (line.pts[i-1].v <= 0 && line.pts[i].v >= 0) {
-          const frac = -line.pts[i-1].v / (line.pts[i].v - line.pts[i-1].v);
-          const px = xp(line.pts[i-1].t + frac);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">`;
+
+  // Clip path to keep lines inside chart area
+  svg += `<defs><clipPath id="cp_${inv.name.replace(/[^a-zA-Z0-9]/g,'')}"><rect x="${L}" y="${T}" width="${PW}" height="${PH}"/></clipPath></defs>`;
+
+  const clipId = `cp_${inv.name.replace(/[^a-zA-Z0-9]/g,'')}`;
+
+  // Grid lines + Y labels
+  const tickCount = 4;
+  for (let i = 0; i <= tickCount; i++) {
+    const v = vMin + (i / tickCount) * vRange;
+    const y = yp(v);
+    svg += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W-R}" y2="${y.toFixed(1)}" stroke="rgba(128,128,128,0.1)" stroke-width="1"/>`;
+    svg += `<text x="${L-5}" y="${(y+3).toFixed(1)}" font-size="9" text-anchor="end" fill="rgba(128,128,128,0.6)">${Math.round(v/10000)}萬</text>`;
+  }
+
+  // X labels
+  const xTicks = [0, Math.round(maxYears/2), maxYears];
+  xTicks.forEach(t => {
+    svg += `<text x="${xp(t).toFixed(1)}" y="${H-8}" font-size="9" text-anchor="middle" fill="rgba(128,128,128,0.6)">${t}年</text>`;
+  });
+
+  // Zero line
+  const zy = yp(0);
+  svg += `<line x1="${L}" y1="${zy.toFixed(1)}" x2="${W-R}" y2="${zy.toFixed(1)}" stroke="rgba(128,128,128,0.25)" stroke-width="1"/>`;
+
+  // Threshold line
+  if (thresh > 0 && thresh <= maxYears) {
+    const tx = xp(thresh);
+    svg += `<line x1="${tx.toFixed(1)}" y1="${T}" x2="${tx.toFixed(1)}" y2="${H-B}" stroke="#E24B4A" stroke-width="1.5" stroke-dasharray="5,4"/>`;
+    svg += `<text x="${(tx+3).toFixed(1)}" y="${(T+10).toFixed(1)}" font-size="9" fill="#E24B4A">門檻${thresh}年</text>`;
+  }
+
+  // Lines with clipping
+  lines.forEach(({ color, line }) => {
+    const d = line.pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(p.t).toFixed(1)},${yp(p.v).toFixed(1)}`).join(' ');
+    svg += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" clip-path="url(#${clipId})"/>`;
+
+    // Payback dot
+    for (let i = 1; i < line.pts.length; i++) {
+      if (line.pts[i-1].v <= 0 && line.pts[i].v >= 0) {
+        const frac = -line.pts[i-1].v / (line.pts[i].v - line.pts[i-1].v);
+        const px = xp(line.pts[i-1].t + frac);
+        if (px >= L && px <= W-R) {
           svg += `<circle cx="${px.toFixed(1)}" cy="${zy.toFixed(1)}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>`;
-          break;
         }
+        break;
       }
-      const last = line.pts[line.pts.length - 1];
-      svg += `<text x="${xp(last.t)+4}" y="${yp(last.v)+3}" font-size="9" fill="${color}">${fmt(last.v)}</text>`;
-    });
+    }
 
-    svg += '</svg>';
+    // End value label - only show if within bounds
+    const last = line.pts[line.pts.length - 1];
+    const endY = yp(last.v);
+    if (endY >= T - 10 && endY <= H - B + 10) {
+      svg += `<text x="${(xp(last.t)+4).toFixed(1)}" y="${(endY+3).toFixed(1)}" font-size="9" fill="${color}">${fmt(last.v)}</text>`;
+    }
+  });
 
-    const name = inv.material_name || inv.name || '';
-    const cat = inv.category || '';
-    return `<div style="margin-bottom:1.5rem">
-      <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px">${name}</div>
-      <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">${cat}</div>
-      ${svg}
-    </div>`;
+  svg += '</svg>';
+  return svg;
 }
 
 // ======= GOOGLE SHEETS =======
@@ -3036,6 +3058,8 @@ async function sendToSheets() {
   const activeInvs = state.investments.filter(i => i.active);
   const sp = state.prices.stable;
   const ap = state.prices.aggressive;
+  const payback_thresh = +document.getElementById('payback_threshold').value || 7;
+  const bcr_thresh = +document.getElementById('bcr_threshold').value || 1;
 
   const ts = new Date().toISOString();
   const userInfo = currentUser || { email: 'anonymous' };
