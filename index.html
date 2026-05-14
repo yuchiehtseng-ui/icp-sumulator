@@ -1499,6 +1499,15 @@ select option { background: var(--surface2); }
     <button class="threshold-edit-btn" onclick="goToSection(2)">修改 →</button>
   </div>
 
+  <div style="margin-bottom:1rem">
+    <div style="display:flex;gap:16px;font-size:12px;color:var(--color-text-secondary);flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:3px;background:#888780;display:inline-block;border-radius:2px"></span>原始情境</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:3px;background:#1D9E75;display:inline-block;border-radius:2px"></span>穩健影子價格</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:3px;background:#BA7517;display:inline-block;border-radius:2px"></span>積極影子價格</span>
+      <span style="display:flex;align-items:center;gap:4px"><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#E24B4A" stroke-width="1.5" stroke-dasharray="4,3"/></svg>回收門檻</span>
+    </div>
+    <div id="cumulativeCharts"></div>
+  </div>
   <div id="resultsTable">
     <p style="padding:20px;color:var(--text-muted);">請先完成前四步驟的設定。</p>
   </div>
@@ -2920,7 +2929,99 @@ function buildResults() {
     });
   }
 
+
+  // ── 累積收益圖表 ──
+  if (!isUpstream) {
+    const chartHTML = buildCumulativeCharts(activeInvs, sp, ap, payback_thresh);
+    const chartContainer = document.getElementById('cumulativeCharts');
+    if (chartContainer) chartContainer.innerHTML = chartHTML;
+  }
+
   document.getElementById('resultsTable').innerHTML = html || '<p style="padding:20px;color:#8ebd9d;">無符合條件的項目</p>';
+}
+
+function buildCumulativeCharts(invs, sp, ap, thresh) {
+  const W=560, H=190, L=52, R=24, T=14, B=28, PW=W-L-R, PH=H-T-B;
+  const CO='#888780', CS='#1D9E75', CA='#BA7517';
+
+  function makeLine(inv, carbonPrice) {
+    const ms = calcMetrics(inv, carbonPrice);
+    if (!ms) return null;
+    const cost = inv.rd_cost || inv.cost || 0;
+    const annualNet = (ms.annualProfitAdj !== undefined ? ms.annualProfitAdj : (inv.benefit - (inv.opex||0)));
+    const years = inv.product_life || inv.years || 10;
+    const pts = [];
+    for (let t = 0; t <= years; t++) {
+      pts.push({ t, v: -cost + annualNet * t });
+    }
+    return { pts, years };
+  }
+
+  return invs.filter(i=>i.active).map(inv => {
+    const lines = [
+      { color: CO, label: '原始',   line: makeLine(inv, 0) },
+      { color: CS, label: '穩健',   line: makeLine(inv, sp) },
+      { color: CA, label: '積極',   line: makeLine(inv, ap) },
+    ].filter(l => l.line);
+
+    const allVals = lines.flatMap(l => l.line.pts.map(p => p.v));
+    const maxYears = Math.max(...lines.map(l => l.line.years));
+    const vMin = Math.min(...allVals) * 1.15;
+    const vMax = Math.max(...allVals) * 1.15;
+    const vRange = vMax - vMin || 1;
+
+    function xp(t) { return L + (t / maxYears) * PW; }
+    function yp(v) { return T + (1 - (v - vMin) / vRange) * PH; }
+    function fmt(v) { return (v >= 0 ? '+' : '') + Math.round(v / 10000) + '萬'; }
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
+
+    // Grid
+    for (let i = 0; i <= 4; i++) {
+      const v = vMin + (i / 4) * vRange;
+      const y = yp(v);
+      svg += `<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="rgba(128,128,128,0.12)" stroke-width="1"/>`;
+      svg += `<text x="${L-4}" y="${y+3}" font-size="9" text-anchor="end" fill="rgba(128,128,128,0.7)">${Math.round(v/10000)}萬</text>`;
+    }
+    // X labels
+    [0, Math.round(maxYears/2), maxYears].forEach(t => {
+      svg += `<text x="${xp(t)}" y="${H-6}" font-size="9" text-anchor="middle" fill="rgba(128,128,128,0.7)">${t}年</text>`;
+    });
+    // Zero line
+    const zy = yp(0);
+    svg += `<line x1="${L}" y1="${zy}" x2="${W-R}" y2="${zy}" stroke="rgba(128,128,128,0.3)" stroke-width="1"/>`;
+    // Threshold
+    if (thresh <= maxYears) {
+      const tx = xp(thresh);
+      svg += `<line x1="${tx}" y1="${T}" x2="${tx}" y2="${H-B}" stroke="#E24B4A" stroke-width="1.5" stroke-dasharray="5,4"/>`;
+      svg += `<text x="${tx+3}" y="${T+10}" font-size="9" fill="#E24B4A">門檻${thresh}年</text>`;
+    }
+    // Lines + payback dots
+    lines.forEach(({ color, line }) => {
+      const d = line.pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(p.t).toFixed(1)},${yp(p.v).toFixed(1)}`).join(' ');
+      svg += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
+      for (let i = 1; i < line.pts.length; i++) {
+        if (line.pts[i-1].v <= 0 && line.pts[i].v >= 0) {
+          const frac = -line.pts[i-1].v / (line.pts[i].v - line.pts[i-1].v);
+          const px = xp(line.pts[i-1].t + frac);
+          svg += `<circle cx="${px.toFixed(1)}" cy="${zy.toFixed(1)}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>`;
+          break;
+        }
+      }
+      const last = line.pts[line.pts.length - 1];
+      svg += `<text x="${xp(last.t)+4}" y="${yp(last.v)+3}" font-size="9" fill="${color}">${fmt(last.v)}</text>`;
+    });
+
+    svg += '</svg>';
+
+    const name = inv.material_name || inv.name || '';
+    const cat = inv.category || '';
+    return `<div style="margin-bottom:1.5rem">
+      <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px">${name}</div>
+      <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">${cat}</div>
+      ${svg}
+    </div>`;
+  }).join('');
 }
 
 // ======= GOOGLE SHEETS =======
@@ -3023,15 +3124,46 @@ async function sendToSheets() {
   const defaultsForTarget = isDownstream ? INV_DEFAULTS_downstream
                           : isUpstream   ? INV_DEFAULTS_upstream
                           : INV_DEFAULTS_scope12;
-  const rows = activeInvs.map(inv => {
+  // 上游：展開成每個供應商 vs 基準的比較列
+  let rows = [];
+  if (isUpstream) {
+    activeInvs.forEach(mat => {
+      const defKey = mat.material_name;
+      const def = defaultsForTarget[defKey] || {};
+      const baseline = mat.suppliers.find(s => s.is_baseline) || mat.suppliers[0];
+      mat.suppliers.filter(s => !s.is_baseline).forEach((sup, si) => {
+        const ds = (def.suppliers||[])[si+1] || {};
+        rows.push({
+          name: mat.material_name,
+          category: mat.category,
+          annual_qty: mat.annual_qty,
+          annual_qty_modified: def.annual_qty !== undefined && mat.annual_qty !== def.annual_qty,
+          suppliers: mat.suppliers.map((s, sIdx) => {
+            const dSup = (def.suppliers||[])[sIdx] || {};
+            return {
+              name: s.name,
+              unit_price: s.unit_price,
+              co2_intensity: s.co2_intensity,
+              contract_years: s.contract_years,
+              is_baseline: !!s.is_baseline,
+              unit_price_modified:     dSup.unit_price    !== undefined && s.unit_price    !== dSup.unit_price,
+              co2_intensity_modified:  dSup.co2_intensity !== undefined && s.co2_intensity !== dSup.co2_intensity,
+              contract_years_modified: dSup.contract_years!== undefined && s.contract_years!== dSup.contract_years,
+            };
+          })
+        });
+      });
+    });
+  } else {
+  rows = activeInvs.map(inv => {
     const ms = calcMetrics(inv, sp);
     const ma = calcMetrics(inv, ap);
-    const defKey = isUpstream ? inv.material_name : inv.name;
+    const defKey = inv.name;
     const def = defaultsForTarget[defKey] || {};
     const isDn = isDownstream;
-    const isUp = isUpstream;
+    const isUp = false;
     return {
-      name: isUp ? inv.material_name : inv.name,
+      name: inv.name,
       category: inv.category,
       cost: isDn ? inv.rd_cost : inv.cost,
       benefit: inv.benefit, opex: inv.opex,
@@ -3054,22 +3186,6 @@ async function sendToSheets() {
       emission_gkm_modified:   isDn && def.emission_gkm  !== undefined && inv.emission_gkm  !== def.emission_gkm,
       annual_km_modified:      isDn && def.annual_km     !== undefined && inv.annual_km     !== def.annual_km,
       emission_direct_modified:isDn && def.emission_direct!==undefined && inv.emission_direct!==def.emission_direct,
-      // 上游專屬
-      annual_qty: isUp ? inv.annual_qty : undefined,
-      annual_qty_modified: isUp && def.annual_qty !== undefined && inv.annual_qty !== def.annual_qty,
-      suppliers: isUp ? (inv.suppliers||[]).map((s,si) => {
-        const ds = (def.suppliers||[])[si] || {};
-        return {
-          name: s.name,
-          unit_price: s.unit_price,
-          co2_intensity: s.co2_intensity,
-          contract_years: s.contract_years,
-          is_baseline: !!s.is_baseline,
-          unit_price_modified:     ds.unit_price    !== undefined && s.unit_price    !== ds.unit_price,
-          co2_intensity_modified:  ds.co2_intensity !== undefined && s.co2_intensity !== ds.co2_intensity,
-          contract_years_modified: ds.contract_years!== undefined && s.contract_years!== ds.contract_years,
-        };
-      }) : undefined,
       stable_price: sp, aggr_price: ap,
       carbon_benefit_stable: ms.carbonBenefit, carbon_benefit_aggr: ma.carbonBenefit,
       payback_orig: ms.payback_orig, payback_stable: ms.payback_adj, payback_aggr: ma.payback_adj,
@@ -3077,6 +3193,7 @@ async function sendToSheets() {
       bcr_orig: ms.bcr_orig, bcr_stable: ms.bcr_adj, bcr_aggr: ma.bcr_adj,
     };
   });
+  } // end else (non-upstream)
 
   // ── Payload A：使用者選擇 Step 01-02 ──
   const choicesPayload = {
