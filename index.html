@@ -1098,7 +1098,7 @@ select option { background: var(--surface2); }
     </div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">進入工具</button>
     <div class="login-error" id="loginError">Email 或邀請碼不正確，請確認後重試。</div>
-    <p class="login-note">您的使用記錄將被記錄以協助我們改善工具品質。</p>
+    
   </div>
 </div>
 
@@ -2963,7 +2963,7 @@ async function sendToSheets() {
     investments: rows
   };
 
-  if (!SHEET_URL || SHEET_URL === 'https://script.google.com/macros/s/AKfycbxR5Q0P1B4s6aEmD6Bz9F7Tt54AaNHilTxe1v9lGe4bm7JLxNLQz8x2EVYOFYxdvzrG/exec') {
+  if (false) { // demo mode disabled
     // Demo mode - show what would be sent
     statusEl.innerHTML = `
       <strong style="color:#1b475d;">✓ 模擬模式</strong>（尚未設定 Apps Script URL）<br>
@@ -3085,7 +3085,7 @@ async function doLogin() {
   btn.textContent = '驗證中...';
 
   // Demo mode (no URL set)
-  if (APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxR5Q0P1B4s6aEmD6Bz9F7Tt54AaNHilTxe1v9lGe4bm7JLxNLQz8x2EVYOFYxdvzrG/exec') {
+  if (!APPS_SCRIPT_URL) {
     // Allow any input in demo mode
     currentUser = { email, inviteCode: code };
     onLoginSuccess();
