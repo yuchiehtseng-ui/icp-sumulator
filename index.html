@@ -3195,6 +3195,9 @@ async function sendToSheets() {
   });
   } // end else (non-upstream)
 
+  console.log('[sendToSheets] target:', state.target, '| rows count:', rows.length);
+  if (rows.length > 0) console.log('[sendToSheets] first row sample:', JSON.stringify(rows[0]).substring(0, 200));
+
   // ── Payload A：使用者選擇 Step 01-02 ──
   const choicesPayload = {
     type: 'choices',
@@ -3248,11 +3251,15 @@ async function sendToSheets() {
     // POST with no-cors: Apps Script doesn't return CORS headers on POST
     // so we fire-and-forget; assume success if no network error
     for (const p of [choicesPayload, investPayload, pricePayload, payload]) {
-      await fetch(SHEET_URL, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(p)
-      });
+      try {
+        await fetch(SHEET_URL, {
+          method: 'POST', mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(p)
+        });
+      } catch(fetchErr) {
+        console.error('Fetch error for type=' + p.type, fetchErr);
+      }
     }
     statusEl.innerHTML = `<strong style="color:#2d7a1a;">✓ 已成功送出！資料正在寫入 Google Sheets。</strong>`;
   } catch (e) {
