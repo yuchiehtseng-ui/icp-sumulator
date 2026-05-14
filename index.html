@@ -1,0 +1,3133 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>內部碳定價影子價格模擬工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface2: #fff5d2;
+  --border: #b3bd61;
+  --accent: #1b475d;
+  --accent2: #4ea72e;
+  --accent3: #fcd564;
+  --danger: #c0392b;
+  --text: #1b475d;
+  --text-muted: #5a7a6a;
+  --text-dim: #8ebd9d;
+  --card-radius: 12px;
+  --transition: 0.2s ease;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+header {
+  background: linear-gradient(135deg, #1b475d 0%, #2a6b87 100%);
+  border-bottom: 1px solid rgba(255,245,208,0.2);
+  padding: 24px 40px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.logo-mark {
+  width: 40px; height: 40px;
+  background: #fad564;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark span { font-size: 18px; font-weight: 700; color: #fff5d0; }
+.header-title h1 {
+  font-size: 18px; font-weight: 700; letter-spacing: 0.05em;
+  background: linear-gradient(90deg, #fff5d0, #fad564);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.header-title p { font-size: 12px; color: #8ebd9d; letter-spacing: 0.1em; margin-top: 2px; }
+
+/* PROGRESS NAV */
+.progress-nav {
+  display: flex; align-items: center;
+  background: #ffffff;
+  border-bottom: 2px solid #b3bd61;
+  padding: 0 40px;
+  margin: 0;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.progress-nav::-webkit-scrollbar { display: none; }
+.nav-step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nav-step .step-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #fff5d2;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  font-family: 'IBM Plex Mono', monospace;
+  transition: var(--transition);
+}
+.nav-step .step-label { font-size: 13px; color: var(--text-muted); transition: var(--transition); }
+.nav-step.active { border-bottom-color: var(--accent); }
+.nav-step.active .step-num { background: var(--accent); color: #fff5d0; border-color: var(--accent); }
+.nav-step.active .step-label { color: var(--text); }
+.nav-step.done .step-num { background: var(--accent); opacity: 0.5; color: #fff5d0; }
+.nav-step.done .step-label { color: var(--text-muted); }
+.nav-step:hover:not(.active) .step-label { color: var(--text); }
+
+/* MAIN LAYOUT */
+main { padding: 30px 40px 60px; max-width: 1200px; margin: 0 auto; }
+
+/* SECTIONS */
+.section {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+.section.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.section-header {
+  display: flex; align-items: flex-start;
+  gap: 16px; margin-bottom: 28px;
+}
+.section-badge {
+  background: #1b475d;
+  border: 1px solid #1b475d;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; color: #fff5d0;
+  letter-spacing: 0.1em; flex-shrink: 0; margin-top: 4px;
+}
+.section-title h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.section-title p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+
+/* CARDS */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 20px;
+  transition: var(--transition);
+}
+.card:hover { border-color: #8ebd9d; }
+
+/* OPTION CARDS (selectable) */
+.option-grid { display: grid; gap: 16px; }
+.option-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.option-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+.option-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.option-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: 0; transition: opacity 0.2s;
+}
+.option-card:hover { border-color: #4ea72e; transform: translateY(-2px); }
+.option-card.selected { border-color: var(--accent); background: rgba(27,71,93,0.05); }
+.option-card.selected::before { background: radial-gradient(ellipse at top left, rgba(27,71,93,0.08), transparent); opacity: 1; }
+
+.option-icon { font-size: 28px; margin-bottom: 12px; }
+.option-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.option-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.option-tag {
+  display: inline-block; margin-top: 10px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 500;
+  background: rgba(27,71,93,0.1); color: var(--accent);
+  border: 1px solid rgba(27,71,93,0.25);
+}
+.option-tag.locked { background: rgba(255,255,255,0.05); color: var(--text-muted); border-color: var(--border); }
+.check-mark {
+  position: absolute; top: 12px; right: 12px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: #0d1117;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; opacity: 0; transition: opacity 0.2s;
+}
+.option-card.selected .check-mark { opacity: 1; }
+
+/* FORM ELEMENTS */
+label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+input[type="number"], input[type="text"], select, textarea {
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px;
+  color: var(--text); font-size: 14px;
+  font-family: 'Noto Sans TC', sans-serif;
+  transition: border-color 0.2s;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus { border-color: #1b475d; box-shadow: 0 0 0 2px rgba(27,71,93,0.1); }
+select option { background: var(--surface2); }
+
+.input-group { margin-bottom: 16px; }
+.input-with-unit {
+  display: flex; align-items: center; gap: 0;
+}
+.input-with-unit input { border-radius: 8px 0 0 8px; }
+.unit-badge {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-left: none;
+  padding: 10px 12px; border-radius: 0 8px 8px 0;
+  font-size: 13px; color: var(--text-muted);
+  white-space: nowrap;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* CHECKBOX / TOGGLE ROWS */
+.check-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 10px;
+  cursor: pointer; transition: all 0.2s;
+  background: #ffffff;
+}
+.check-row:hover { border-color: var(--accent2); background: rgba(78,167,46,0.04); }
+.check-row.checked { border-color: var(--accent); background: rgba(27,71,93,0.04); }
+.check-box {
+  width: 18px; height: 18px; border-radius: 4px;
+  border: 2px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; transition: all 0.2s; margin-top: 2px;
+}
+.check-row.checked .check-box { background: var(--accent); border-color: var(--accent); color: #fff5d0; }
+.check-row-content { flex: 1; }
+.check-row-title { font-size: 14px; font-weight: 500; }
+.check-row-desc { font-size: 12px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+
+/* SUBMIT BUTTON */
+.btn-submit {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-top: 24px;
+  padding: 12px 28px;
+  background: var(--accent);
+  color: #fff5d0; font-weight: 700;
+  font-size: 14px; letter-spacing: 0.03em;
+  border: none; border-radius: 8px;
+  cursor: pointer; transition: all 0.2s;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.btn-submit:hover { background: #2a6b87; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(27,71,93,0.25); }
+.btn-submit .arrow { font-size: 16px; }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px;
+  background: transparent; color: var(--text);
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; transition: all 0.2s;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.btn-secondary:hover { border-color: #4ea72e; color: #4ea72e; }
+
+/* SECTION DIVIDER */
+.section-divider { 
+  border: none; border-top: 1px solid var(--border);
+  margin: 28px 0;
+}
+
+/* INVESTMENT TABLE */
+.inv-table { width: 100%; border-collapse: collapse; }
+.inv-table th {
+  text-align: left; font-size: 12px; font-weight: 500;
+  color: var(--text-muted); padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em;
+}
+.inv-table td {
+  padding: 12px; border-bottom: 1px solid rgba(179,189,97,0.4);
+  font-size: 14px; vertical-align: middle;
+}
+.inv-table tr:last-child td { border-bottom: none; }
+.inv-table input[type="number"], .inv-table input[type="text"] {
+  padding: 6px 10px; font-size: 13px;
+}
+.inv-table select { padding: 6px 10px; font-size: 13px; }
+
+/* PRICE TABLE */
+.price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.price-section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.price-section-label::after {
+  content: ''; flex: 1; height: 1px; background: #b3bd61;
+}
+.price-row {
+  display: grid; grid-template-columns: 1fr 130px 130px;
+  gap: 10px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid rgba(179,189,97,0.4);
+}
+.price-row:last-child { border-bottom: none; }
+.price-row-label { font-size: 13px; color: var(--text-muted); }
+.weight-row {
+  display: grid; grid-template-columns: 1fr 130px;
+  gap: 10px; align-items: center;
+  padding: 8px 0;
+}
+.weight-label { font-size: 12px; color: var(--text-muted); }
+.computed-price {
+  background: #fff5d2; border: 1px solid #b3bd61;
+  border-radius: 8px; padding: 14px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 16px;
+}
+.computed-price .label { font-size: 13px; color: var(--text-muted); }
+.computed-price .value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 20px; font-weight: 500; color: #1b475d;
+}
+.computed-price .value.aggressive { color: #c07d00; }
+
+/* RESULTS TABLE */
+.results-card {
+  background: #ffffff;
+  border: 1px solid #b3bd61;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+.results-card table { width: 100%; border-collapse: collapse; }
+.results-card thead th {
+  background: #1b475d;
+  padding: 12px 16px;
+  font-size: 12px; font-weight: 600;
+  color: #fff5d0; text-align: center;
+  border-bottom: 1px solid #b3bd61;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.results-card thead th:first-child { text-align: left; }
+.results-card tbody td {
+  padding: 14px 16px;
+  font-size: 13px; text-align: center;
+  border-bottom: 1px solid rgba(179,189,97,0.3);
+}
+.results-card tbody td:first-child { text-align: left; font-weight: 500; }
+.results-card tbody tr:last-child td { border-bottom: none; }
+.metric-orig { color: #8ebd9d; font-family: 'IBM Plex Mono', monospace; }
+.metric-stable { color: #2d7a1a; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+.metric-aggr { color: #c07d00; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+.metric-better { color: #2d7a1a; }
+.metric-worse { color: var(--danger); }
+
+.pass-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 4px; font-size: 11px; font-weight: 700;
+  margin-left: 4px;
+}
+.pass-badge.pass { background: rgba(78,167,46,0.15); color: #2d7a1a; border: 1px solid rgba(78,167,46,0.3); }
+.pass-badge.fail { background: rgba(192,57,43,0.12); color: var(--danger); border: 1px solid rgba(192,57,43,0.3); }
+
+/* SUMMARY BANNER */
+.summary-banner {
+  display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+}
+.summary-kpi {
+  flex: 1; min-width: 160px;
+  background: #ffffff; border: 1px solid #b3bd61;
+  border-radius: var(--card-radius); padding: 16px;
+}
+.summary-kpi .kpi-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.08em; text-transform: uppercase; }
+.summary-kpi .kpi-value { font-size: 16px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.summary-kpi .kpi-value.green { color: #1b475d; }
+.summary-kpi .kpi-value.blue { color: #4ea72e; }
+.summary-kpi .kpi-value.amber { color: #c07d00; }
+
+/* INDUSTRY REFERENCE */
+.ref-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+}
+.ref-chip {
+  background: #fff5d2; border: 1px solid #b3bd61;
+  border-radius: 6px; padding: 6px 12px;
+  font-size: 12px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.ref-chip strong { color: var(--text); }
+.ref-chip .co { color: #4ea72e; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+/* TOOLTIP */
+.tooltip-wrap { position: relative; display: inline-block; }
+.tooltip-icon {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--text-muted);
+  cursor: help; margin-left: 6px;
+  vertical-align: middle;
+}
+.tooltip-box {
+  display: none; position: absolute;
+  bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #fff5d2; border: 1px solid #b3bd61;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 12px; color: #5a7a6a;
+  width: 220px; line-height: 1.5; z-index: 50;
+  box-shadow: 0 8px 24px rgba(27,71,93,0.15);
+}
+.tooltip-wrap:hover .tooltip-box { display: block; }
+
+/* INLINE NOTE */
+.note {
+  font-size: 12px; color: var(--text-muted);
+  background: rgba(78,167,46,0.07); border-left: 3px solid #8ebd9d;
+  padding: 10px 14px; border-radius: 0 6px 6px 0;
+  margin-top: 10px; line-height: 1.5;
+}
+
+/* GRID HELPERS */
+.row { display: flex; gap: 16px; }
+.col-half { flex: 1; min-width: 0; }
+.col-third { flex: 1; min-width: 0; }
+
+/* SCENARIO TAG */
+.scenario-col-header {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.scenario-label {
+  font-size: 10px; padding: 2px 8px; border-radius: 20px;
+  font-weight: 600; letter-spacing: 0.06em;
+}
+.scenario-label.orig { background: rgba(142,189,157,0.2); color: #5a7a6a; }
+.scenario-label.stable { background: rgba(78,167,46,0.15); color: #4ea72e; }
+.scenario-label.aggr { background: rgba(250,213,100,0.3); color: #b08000; }
+
+/* SECTION 3 - INVESTMENT DECISIONS */
+.inv-block {
+  background: #ffffff; border: 1px solid #b3bd61;
+  border-radius: var(--card-radius); padding: 20px;
+  margin-bottom: 16px;
+}
+.inv-block-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.inv-block-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #fff5d2; border: 1px solid #b3bd61;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+  color: #1b475d; flex-shrink: 0;
+}
+.inv-block-title { font-size: 15px; font-weight: 600; flex: 1; }
+.inv-block-toggle {
+  width: 44px; height: 24px; border-radius: 12px;
+  background: #e8f0e8; border: 1px solid #b3bd61;
+  position: relative; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+}
+.inv-block-toggle.on { background: #4ea72e; border-color: #4ea72e; }
+.inv-block-toggle::after {
+  content: ''; position: absolute;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text-muted); top: 2px; left: 2px;
+  transition: all 0.2s;
+}
+.inv-block-toggle.on::after { left: 22px; background: #ffffff; }
+
+/* Google Sheets button */
+.gs-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px;
+  background: #34a853; color: white;
+  font-weight: 600; font-size: 13px;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-family: 'Noto Sans TC', sans-serif; transition: all 0.2s;
+}
+.gs-btn:hover { background: #2d9249; transform: translateY(-1px); }
+.gs-btn svg { width: 16px; height: 16px; }
+
+/* ADD ROW BTN */
+.add-row-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; background: transparent;
+  border: 1px dashed var(--border); border-radius: 6px;
+  color: var(--text-muted); font-size: 13px;
+  cursor: pointer; margin-top: 10px; transition: all 0.2s;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.add-row-btn:hover { border-color: #4ea72e; color: #4ea72e; }
+
+/* REMOVE ROW */
+.remove-btn {
+  background: none; border: none;
+  color: var(--text-dim); cursor: pointer;
+  font-size: 16px; padding: 4px; transition: color 0.2s;
+}
+.remove-btn:hover { color: var(--danger); }
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  header { padding: 16px 20px; }
+  .progress-nav { padding: 0 20px; }
+  main { padding: 20px 20px 40px; }
+  .option-grid.cols-3 { grid-template-columns: 1fr; }
+  .option-grid.cols-2 { grid-template-columns: 1fr; }
+  .price-grid { grid-template-columns: 1fr; }
+  .row { flex-direction: column; }
+}
+
+/* LIGHTBULB HINT */
+.hint-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #fff5d2; border: 1px solid #b3bd61;
+  cursor: pointer; font-size: 14px;
+  transition: all 0.2s; flex-shrink: 0;
+  position: relative;
+}
+.hint-btn:hover { background: #fad564; border-color: #f7d364; transform: scale(1.1); }
+.hint-popover {
+  display: none; position: fixed;
+  background: #ffffff; border: 1px solid #b3bd61;
+  border-radius: 10px; padding: 12px 16px;
+  font-size: 13px; color: #1b475d;
+  width: 300px; line-height: 1.6; z-index: 9999;
+  box-shadow: 0 6px 20px rgba(27,71,93,0.15);
+  text-align: left;
+}
+.hint-popover::after {
+  content: ''; position: absolute;
+  top: 50%; left: -7px; transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #b3bd61;
+}
+.hint-popover.open { display: block; }
+.hint-popover .hint-title {
+  font-weight: 700; margin-bottom: 6px; color: #1b475d;
+  display: flex; align-items: center; gap: 6px;
+}
+
+
+/* CRITERIA GRID */
+.criteria-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 4px;
+}
+.criteria-card {
+  border: 2px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #ffffff;
+  opacity: 0.5;
+}
+.criteria-card.checked {
+  border-color: #1b475d;
+  background: #f7fbff;
+  opacity: 1;
+}
+.criteria-card:hover { border-color: #4ea72e; opacity: 1; }
+.criteria-card-top {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 14px;
+}
+.criteria-info { flex: 1; }
+.criteria-setting {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff5d2; border: 1px solid #b3bd61;
+  border-radius: 8px; padding: 8px 12px;
+  margin-top: 4px;
+}
+.criteria-setting input {
+  width: 60px; text-align: center;
+  background: #ffffff; border: 1px solid #b3bd61;
+  border-radius: 6px; padding: 4px 6px;
+  font-size: 15px; font-weight: 700; color: #1b475d;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.criteria-cond {
+  font-size: 12px; color: #5a7a6a; white-space: nowrap;
+  font-weight: 500; flex: 1;
+}
+.criteria-unit {
+  font-size: 13px; color: #1b475d; font-weight: 600;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .criteria-grid { grid-template-columns: 1fr; }
+}
+
+
+/* STEP 4 - ORIENTATION SPLIT */
+.orientation-split {
+  display: flex; align-items: center; gap: 20px;
+  padding: 8px 0 4px;
+}
+.orient-block {
+  text-align: center; min-width: 120px;
+}
+.orient-label { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.orient-pct {
+  font-size: 36px; font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1;
+}
+.orient-block.intl .orient-pct { color: #1b475d; }
+.orient-block.dom .orient-pct { color: #4ea72e; }
+.orient-sub { font-size: 11px; color: #8ebd9d; margin-top: 4px; }
+.orient-slider-wrap { flex: 1; }
+.orient-slider {
+  -webkit-appearance: none; width: 100%; height: 6px;
+  border-radius: 3px; outline: none; cursor: pointer;
+  background: linear-gradient(to right, #4ea72e 0%, #4ea72e 70%, #1b475d 70%, #1b475d 100%);
+}
+.orient-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px;
+  border-radius: 50%; background: #ffffff;
+  border: 3px solid #1b475d; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(27,71,93,0.2);
+}
+.orient-slider::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #ffffff; border: 3px solid #1b475d; cursor: pointer;
+}
+.orient-track-labels {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: #8ebd9d; margin-top: 6px;
+  padding: 0 2px;
+}
+
+/* STEP 4 - DETAIL GRID */
+.price-detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.detail-header-row {
+  display: grid; grid-template-columns: 1fr 90px 120px 120px 20px;
+  gap: 8px; padding: 6px 0 8px;
+  border-bottom: 1px solid #b3bd61;
+  font-size: 11px; color: #8ebd9d;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.detail-row {
+  display: grid; grid-template-columns: 1fr 90px 120px 120px 20px;
+  gap: 8px; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid rgba(179,189,97,0.35);
+}
+.detail-label { font-size: 13px; color: #1b475d; display: flex; align-items: center; gap: 4px; }
+.detail-row input {
+  padding: 6px 8px; font-size: 13px; text-align: center;
+}
+.detail-subtotal {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 10px; padding: 8px 10px;
+  background: #fff5d2; border-radius: 6px;
+  font-size: 12px; color: #5a7a6a; font-weight: 600;
+}
+.subtotal-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; font-weight: 700; color: #1b475d;
+}
+.subtotal-num.bad { color: #c0392b; }
+@media (max-width: 900px) {
+  .price-detail-grid { grid-template-columns: 1fr; }
+  .orientation-split { flex-direction: column; }
+  .orient-slider-wrap { width: 100%; }
+}
+
+
+/* UPSTREAM TWO-LEVEL UI */
+.mat-block { padding: 0; overflow: hidden; }
+.mat-block-header {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #b3bd61;
+  background: #f7fdf9;
+}
+.mat-name-input {
+  background: transparent; border: none;
+  font-size: 16px; font-weight: 700; color: #1b475d;
+  width: 100%; padding: 0; font-family: 'Noto Sans TC', sans-serif;
+  border-bottom: 2px solid transparent; transition: border-color 0.2s;
+}
+.mat-name-input:focus { outline: none; border-bottom-color: #4ea72e; }
+.mat-cat-select {
+  padding: 4px 10px; font-size: 12px; border-radius: 6px;
+  border: 1px solid #b3bd61; background: #ffffff; color: #1b475d;
+  font-family: 'Noto Sans TC', sans-serif; cursor: pointer;
+}
+.mat-summary-pill {
+  display: inline-flex; align-items: center;
+  background: rgba(78,167,46,0.1); border: 1px solid rgba(78,167,46,0.3);
+  border-radius: 20px; padding: 3px 12px;
+  font-size: 12px; color: #2d7a1a;
+}
+.mat-summary-pill strong { margin: 0 3px; }
+
+.supplier-table-wrap { padding: 14px 20px 16px; }
+.supplier-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+.supplier-table thead th {
+  text-align: left; font-size: 11px; font-weight: 600;
+  color: #8ebd9d; padding: 6px 10px 8px;
+  border-bottom: 1px solid #b3bd61;
+  font-family: 'IBM Plex Mono', monospace; white-space: nowrap;
+}
+.sup-row td {
+  padding: 8px 10px; border-bottom: 1px solid rgba(179,189,97,0.3);
+  vertical-align: middle;
+}
+.sup-row:last-child td { border-bottom: none; }
+.baseline-row { background: rgba(27,71,93,0.03); }
+.baseline-badge {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  background: #1b475d; color: #fff5d0;
+  border-radius: 4px; padding: 1px 6px; margin-right: 6px;
+  vertical-align: middle;
+}
+.sup-name-input {
+  background: transparent; border: none; border-bottom: 1px dashed #b3bd61;
+  font-size: 13px; color: #1b475d; width: 100%; min-width: 120px;
+  padding: 2px 0; font-family: 'Noto Sans TC', sans-serif;
+}
+.sup-name-input:focus { outline: none; border-bottom-color: #4ea72e; }
+.sup-num-input {
+  width: 90px; padding: 4px 8px; font-size: 13px;
+  border: 1px solid #b3bd61; border-radius: 6px;
+  background: #ffffff; color: #1b475d; text-align: right;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.sup-calc {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; color: #1b475d; white-space: nowrap;
+}
+.delta { font-size: 11px; display: block; margin-top: 2px; }
+.delta-pos { color: #2d7a1a; }
+.delta-neg { color: #c0392b; }
+.set-baseline-btn {
+  background: none; border: 1px solid #b3bd61;
+  border-radius: 4px; font-size: 11px; color: #5a7a6a;
+  cursor: pointer; padding: 2px 6px; margin-left: 4px;
+  font-family: 'Noto Sans TC', sans-serif; transition: all 0.2s;
+}
+.set-baseline-btn:hover { border-color: #1b475d; color: #1b475d; }
+
+
+/* FILTER BAR */
+.filter-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: #ffffff; border: 1px solid #b3bd61;
+  border-radius: var(--card-radius); padding: 12px 16px;
+}
+.filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-label {
+  font-size: 11px; font-weight: 700; color: #8ebd9d;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.filter-chip {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid #b3bd61; color: #5a7a6a;
+  background: #ffffff; transition: all 0.15s;
+  user-select: none;
+}
+.filter-chip:hover { border-color: #1b475d; color: #1b475d; }
+.filter-chip.active {
+  background: #1b475d; border-color: #1b475d;
+  color: #fff5d0; font-weight: 600;
+}
+.filter-chip.cat-chip.active {
+  background: #4ea72e; border-color: #4ea72e; color: #ffffff;
+}
+.filter-divider {
+  width: 1px; height: 28px; background: #b3bd61; flex-shrink: 0;
+}
+.filter-result {
+  margin-left: auto; font-size: 12px;
+  color: #8ebd9d; font-family: 'IBM Plex Mono', monospace;
+  white-space: nowrap;
+}
+.mat-block.hidden { display: none; }
+
+
+/* RESULTS - GROUPED UPSTREAM */
+.mat-group-row td {
+  background: #f0f7f2; padding: 10px 16px !important;
+  border-bottom: none !important;
+}
+.mat-group-label {
+  font-weight: 700; font-size: 14px; color: #1b475d; margin-right: 10px;
+}
+.mat-group-meta {
+  font-size: 12px; color: #8ebd9d;
+}
+.sup-result-row td { padding-left: 28px !important; }
+.sup-result-name { font-weight: 600; color: #1b475d; font-size: 13px; }
+
+
+/* RESULTS - CARD LAYOUT */
+.res-mat-group {
+  border: 1px solid #b3bd61; border-radius: var(--card-radius);
+  overflow: hidden; margin-bottom: 16px;
+}
+.res-mat-header {
+  display: flex; align-items: center; gap: 12px;
+  background: #1b475d; padding: 12px 18px;
+  color: #fff5d0;
+}
+.res-mat-icon { font-size: 18px; flex-shrink: 0; }
+.res-mat-name { font-size: 15px; font-weight: 700; }
+.res-mat-meta { font-size: 12px; color: #8ebd9d; margin-top: 2px; }
+
+.res-sup-row {
+  display: flex; align-items: flex-start; gap: 0;
+  border-top: 1px solid rgba(179,189,97,0.4);
+  background: #ffffff;
+}
+.res-sup-row:first-of-type { border-top: none; }
+
+.res-sup-info {
+  padding: 14px 18px; min-width: 200px; max-width: 240px; flex-shrink: 0;
+  border-right: 1px solid rgba(179,189,97,0.35);
+}
+.res-sup-name { font-weight: 700; font-size: 13px; color: #1b475d; }
+.res-sup-meta { font-size: 11px; color: #8ebd9d; margin-top: 3px; line-height: 1.5; }
+.res-carbon-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.res-co2-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 20px;
+  background: rgba(27,71,93,0.08); color: #1b475d; border: 1px solid rgba(27,71,93,0.15);
+}
+.res-benefit-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 20px;
+}
+.res-benefit-chip.stable {
+  background: rgba(78,167,46,0.1); color: #2d7a1a; border: 1px solid rgba(78,167,46,0.2);
+}
+.res-benefit-chip.aggr {
+  background: rgba(192,125,0,0.1); color: #c07d00; border: 1px solid rgba(192,125,0,0.2);
+}
+
+.res-metrics-wrap {
+  display: flex; flex: 1; flex-wrap: wrap;
+  border-right: 1px solid rgba(179,189,97,0.35);
+}
+.res-metric-cell {
+  padding: 14px 16px; min-width: 160px; flex: 1;
+  border-right: 1px solid rgba(179,189,97,0.25);
+}
+.res-metric-cell:last-child { border-right: none; }
+.res-metric-label {
+  font-size: 11px; font-weight: 700; color: #8ebd9d;
+  letter-spacing: 0.06em; margin-bottom: 8px;
+}
+.res-metric-row { display: flex; flex-direction: column; gap: 5px; }
+.res-scenario-block {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.res-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px; font-weight: 500; color: #5a7a6a;
+}
+.res-num.metric-better { color: #2d7a1a; font-weight: 700; }
+
+/* .res-verdict removed */
+
+
+.res-baseline-col { background: rgba(27,71,93,0.03); border-right: 2px solid #b3bd61 !important; }
+.res-baseline-tag {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  background: #1b475d; color: #fff5d0;
+  border-radius: 4px; padding: 2px 7px; margin-bottom: 6px;
+}
+.res-metric-sublabel { font-size: 10px; color: #8ebd9d; flex: 1; }
+.res-premium-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 20px;
+}
+.res-premium-chip.neg { background: rgba(192,57,43,0.08); color: #c0392b; border: 1px solid rgba(192,57,43,0.2); }
+.res-premium-chip.pos { background: rgba(78,167,46,0.1); color: #2d7a1a; border: 1px solid rgba(78,167,46,0.2); }
+
+
+.res-verdict-pair {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  margin-bottom: 6px;
+}
+.res-verdict-pair:last-child { margin-bottom: 0; }
+
+
+.res-baseline-row {
+  display: flex; align-items: stretch;
+  background: #fafdf7;
+  border-bottom: 2px solid #b3bd61;
+}
+.res-baseline-row .res-sup-info { padding: 12px 18px; }
+.res-baseline-row .res-metrics-wrap { flex: 1; }
+.res-baseline-row .res-verdict { min-width: 80px; flex-shrink: 0; padding: 12px 16px; border-left: 1px solid rgba(179,189,97,0.35); display: flex; align-items: center; justify-content: center; }
+
+
+/* BASELINE ROW REDESIGN */
+.res-baseline-row {
+  display: flex; align-items: stretch;
+  background: #f7fdf9;
+  border-bottom: 2px solid #b3bd61;
+}
+.res-baseline-left {
+  min-width: 200px; max-width: 240px; flex-shrink: 0;
+  padding: 14px 18px;
+  border-right: 1px solid rgba(179,189,97,0.35);
+}
+.res-baseline-tag-row {
+  font-size: 11px; font-weight: 700; color: #5a7a6a;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.res-baseline-body {
+  flex: 1; display: flex; align-items: center;
+  padding: 14px 20px; gap: 24px;
+}
+.res-baseline-kpi { text-align: center; flex-shrink: 0; }
+.res-baseline-kpi-label {
+  font-size: 11px; color: #8ebd9d; margin-bottom: 4px; font-weight: 600;
+}
+.res-baseline-kpi-val {
+  font-size: 22px; font-weight: 700; color: #1b475d;
+  font-family: 'IBM Plex Mono', monospace; line-height: 1;
+}
+.res-baseline-kpi-val span { font-size: 12px; color: #8ebd9d; font-weight: 400; }
+.res-baseline-divider {
+  width: 1px; height: 40px; background: rgba(179,189,97,0.4); flex-shrink: 0;
+}
+.res-baseline-cost-group { flex: 1; }
+.res-baseline-cost-label {
+  font-size: 11px; font-weight: 700; color: #8ebd9d;
+  letter-spacing: 0.06em; margin-bottom: 8px;
+}
+.res-baseline-costs { display: flex; gap: 20px; flex-wrap: wrap; }
+.res-baseline-cost-item { display: flex; align-items: center; gap: 6px; }
+.res-baseline-cost-num {
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600;
+}
+.res-baseline-cost-num.neutral { color: #8ebd9d; }
+.res-baseline-cost-num.danger  { color: #c0392b; }
+
+
+/* THRESHOLD BAR */
+.threshold-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #ffffff; border: 1px solid #b3bd61;
+  border-radius: var(--card-radius); padding: 12px 18px;
+  margin-bottom: 16px;
+}
+.threshold-bar-label {
+  font-size: 11px; font-weight: 700; color: #8ebd9d;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  white-space: nowrap; flex-shrink: 0;
+}
+.threshold-items { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+.threshold-item {
+  display: flex; align-items: center; gap: 6px;
+  background: #fff5d2; border: 1px solid #b3bd61;
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 12px; color: #1b475d;
+}
+.threshold-item .t-name { color: #5a7a6a; }
+.threshold-item .t-val { font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.threshold-item.disabled { opacity: 0.4; background: #f5f5f5; border-color: #ddd; }
+.threshold-edit-btn {
+  background: none; border: 1px solid #b3bd61; border-radius: 6px;
+  padding: 4px 12px; font-size: 12px; color: #5a7a6a;
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.threshold-edit-btn:hover { border-color: #1b475d; color: #1b475d; }
+
+
+/* DOWNSTREAM PROFIT GRID */
+.ds-profit-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 0; border-top: none;
+}
+.ds-profit-cell {
+  padding: 18px 20px;
+  border-right: 1px solid rgba(179,189,97,0.4);
+}
+.ds-profit-cell:last-child { border-right: none; }
+.ds-cell-label {
+  font-size: 12px; color: #5a7a6a; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.ds-profit-val {
+  font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace;
+  color: #1b475d; margin-bottom: 8px;
+}
+.ds-profit-val.ds-worse { color: #c0392b; }
+.ds-cell-sub {
+  font-size: 12px; color: #8ebd9d; margin-top: 4px;
+}
+.ds-delta { color: #5a7a6a; }
+.ds-delta strong { color: #c0392b; }
+.ds-orig { background: #fafafa; }
+.ds-stable { background: rgba(78,167,46,0.03); }
+.ds-aggr { background: rgba(192,125,0,0.03); }
+@media (max-width: 768px) {
+  .ds-profit-grid { grid-template-columns: 1fr; }
+}
+
+
+.ds-kpi-row { display: flex; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.ds-kpi { flex: 1; min-width: 80px; }
+.ds-kpi-label { font-size: 10px; color: #8ebd9d; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+.ds-kpi-val { font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #1b475d; }
+
+
+/* ===== LOGIN PAGE ===== */
+#loginOverlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: linear-gradient(135deg, #1b475d 0%, #0d2a38 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+#loginOverlay.hidden { display: none; }
+.login-card {
+  background: #ffffff; border-radius: 16px;
+  padding: 48px 40px; width: 100%; max-width: 420px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+}
+.login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+.login-logo-hex {
+  width: 44px; height: 44px; background: #fad564;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700; color: #1b475d; flex-shrink: 0;
+}
+.login-logo-text h2 { font-size: 15px; font-weight: 700; color: #1b475d; line-height: 1.3; }
+.login-logo-text p { font-size: 11px; color: #8ebd9d; margin-top: 2px; letter-spacing: 0.08em; }
+.login-title { font-size: 22px; font-weight: 700; color: #1b475d; margin-bottom: 6px; }
+.login-subtitle { font-size: 13px; color: #5a7a6a; margin-bottom: 28px; line-height: 1.6; }
+.login-field { margin-bottom: 16px; }
+.login-field label {
+  display: block; font-size: 11px; font-weight: 700; color: #5a7a6a;
+  margin-bottom: 6px; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.login-field input {
+  width: 100%; padding: 12px 14px;
+  border: 1px solid #b3bd61; border-radius: 8px;
+  font-size: 14px; color: #1b475d;
+  font-family: 'Noto Sans TC', sans-serif;
+  background: #ffffff; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.login-field input:focus { border-color: #1b475d; box-shadow: 0 0 0 3px rgba(27,71,93,0.1); }
+.login-field input.error { border-color: #c0392b; box-shadow: 0 0 0 3px rgba(192,57,43,0.1); }
+.login-btn {
+  width: 100%; padding: 14px;
+  background: #1b475d; color: #fff5d0;
+  font-size: 15px; font-weight: 700;
+  border: none; border-radius: 8px;
+  cursor: pointer; transition: all 0.2s;
+  font-family: 'Noto Sans TC', sans-serif; margin-top: 8px;
+}
+.login-btn:hover { background: #2a6b87; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(27,71,93,0.3); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.login-error {
+  display: none; margin-top: 14px;
+  padding: 10px 14px; border-radius: 8px;
+  background: rgba(192,57,43,0.08); border: 1px solid rgba(192,57,43,0.25);
+  font-size: 13px; color: #c0392b; text-align: center;
+}
+.login-error.show { display: block; }
+.login-note { margin-top: 20px; font-size: 12px; color: #8ebd9d; text-align: center; line-height: 1.6; }
+
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN OVERLAY ===== -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-hex">C</div>
+      <div class="login-logo-text">
+        <h2>內部碳定價影子價格模擬工具</h2>
+        <p>INTERNAL CARBON PRICING SIMULATOR</p>
+      </div>
+    </div>
+    <h2 class="login-title">請先登入</h2>
+    <p class="login-subtitle">請輸入您的 Email 及專屬邀請碼以存取工具。<br>如尚未取得邀請碼，請聯繫管理員。</p>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <div class="login-field">
+      <label>邀請碼</label>
+      <input type="text" id="loginCode" placeholder="請輸入邀請碼" autocomplete="off"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">進入工具</button>
+    <div class="login-error" id="loginError">Email 或邀請碼不正確，請確認後重試。</div>
+    <p class="login-note">您的使用記錄將被記錄以協助我們改善工具品質。</p>
+  </div>
+</div>
+
+<header>
+  <div class="logo-mark"><span>C</span></div>
+  <div class="header-title">
+    <h1>內部碳定價影子價格模擬工具</h1>
+    <p>INTERNAL CARBON PRICING · SHADOW PRICE SIMULATOR</p>
+  </div>
+</header>
+
+<nav class="progress-nav" id="progressNav">
+  <div class="nav-step active" onclick="goToSection(1)" data-step="1">
+    <div class="step-num">01</div>
+    <div class="step-label">選定目標</div>
+  </div>
+  <div class="nav-step" onclick="goToSection(2)" data-step="2">
+    <div class="step-num">02</div>
+    <div class="step-label">選擇方法與決策指標</div>
+  </div>
+  <div class="nav-step" onclick="goToSection(3)" data-step="3">
+    <div class="step-num">03</div>
+    <div class="step-label">投資決策設定</div>
+  </div>
+  <div class="nav-step" onclick="goToSection(4)" data-step="4">
+    <div class="step-num">04</div>
+    <div class="step-label">影子價格設定</div>
+  </div>
+  <div class="nav-step" onclick="goToSection(5)" data-step="5">
+    <div class="step-num">05</div>
+    <div class="step-label">模擬結果</div>
+  </div>
+</nav>
+
+<main>
+
+<!-- ===== SECTION 1: TARGET ===== -->
+<section class="section active" id="sec1">
+  <div class="section-header">
+    <div class="section-badge">STEP 01</div>
+    <div class="section-title">
+      <h2>選定碳管理目標範疇</h2>
+      <p>請選擇本次影子價格模擬所要對應的減碳目標，不同範疇對應不同的投資決策類型與價格參考點。</p>
+    </div>
+  </div>
+
+  <div class="option-grid cols-3">
+    <div class="option-card" onclick="selectTarget(this,'scope3_upstream')" id="t1">
+      <div class="check-mark">✓</div>
+      <div class="option-icon">⛓️</div>
+      <div class="option-title">範疇3上游<br>原材料減碳</div>
+      <div class="option-desc">針對供應鏈原材料採購（鋼鐵、鋁、塑料等）的碳排放，透過影子價格引導採購決策。</div>
+      <div class="option-tag">Scope 3 Upstream</div>
+    </div>
+    <div class="option-card" onclick="selectTarget(this,'scope12')" id="t2">
+      <div class="check-mark">✓</div>
+      <div class="option-icon">🏭</div>
+      <div class="option-title">自身範疇1＆2<br>直接減碳</div>
+      <div class="option-desc">針對自身營運能源效率、再生能源導入、製程改善等投資的財務評估。</div>
+      <div class="option-tag">Scope 1 & 2</div>
+    </div>
+    <div class="option-card" onclick="selectTarget(this,'scope3_downstream')" id="t3">
+      <div class="check-mark">✓</div>
+      <div class="option-icon">🚗</div>
+      <div class="option-title">範疇3下游<br>產品使用階段</div>
+      <div class="option-desc">針對車輛產品使用階段碳排放的研發投資決策，如電動化、輕量化技術。</div>
+      <div class="option-tag">Scope 3 Downstream</div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;display:flex;align-items:center;gap:8px;">
+    <div class="hint-btn" onclick="toggleHint('hint1')">💡
+      <div class="hint-popover" id="hint1">
+        <div class="hint-title">💡 業界參考</div>
+        車輛產業中，BMW、Volvo、福特等大廠同時覆蓋 Scope 1/2/3；Honda、Subaru 等主要聚焦 Scope 1&amp;2。可依企業減碳目標優先順序選擇。
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-submit" onclick="submitSection(1)">確認目標 <span class="arrow">→</span></button>
+</section>
+
+<!-- ===== SECTION 2: METHOD + CRITERIA ===== -->
+<section class="section" id="sec2">
+  <div class="section-header">
+    <div class="section-badge">STEP 02</div>
+    <div class="section-title">
+      <h2>選擇方法與決策指標</h2>
+      <p>選擇內部碳定價方法，並設定企業現行的投資決策門檻，後續模擬將依此標準判斷投資方案是否通過。</p>
+    </div>
+  </div>
+
+  <div class="option-grid cols-2" style="margin-bottom:24px;">
+    <div class="option-card selected" id="method_shadow" onclick="selectMethod(this,'shadow')">
+      <div class="check-mark">✓</div>
+      <div class="option-icon">💹</div>
+      <div class="option-title">影子價格法</div>
+      <div class="option-desc">將碳排放成本以「假設性」價格納入財務模型，調整投資報酬率、回收年限等指標，引導資本配置。</div>
+      <div class="option-tag">已開放</div>
+    </div>
+    <div class="option-card" style="opacity:0.5;pointer-events:none;">
+      <div class="option-icon">💵</div>
+      <div class="option-title">內部碳費法</div>
+      <div class="option-desc">向內部單位收取實際碳費，形成內部碳收益池，再分配至減碳專案。</div>
+      <div class="option-tag locked">即將開放</div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <div class="section-title" style="margin-bottom:20px;">
+    <h2 style="font-size:18px;">選擇決策指標（可複選）</h2>
+    <p>選擇貴公司現行投資評估所使用的指標，並設定通過門檻。</p>
+  </div>
+
+  <div class="criteria-grid">
+
+    <div class="criteria-card checked" id="cr_payback" onclick="toggleCriteria(this,'payback')">
+      <div class="criteria-card-top">
+        <div class="check-box">✓</div>
+        <div class="criteria-info">
+          <div class="check-row-title">投資回收年限</div>
+          <div class="check-row-desc">Payback Period · 數值越低越佳</div>
+        </div>
+      </div>
+      <div class="criteria-setting" onclick="event.stopPropagation()">
+        <span class="criteria-cond">門檻 ≤</span>
+        <input type="number" id="payback_threshold" value="7" min="1" max="30">
+        <span class="criteria-unit">年</span>
+      </div>
+    </div>
+
+    <div class="criteria-card checked" id="cr_npv" onclick="toggleCriteria(this,'npv')">
+      <div class="criteria-card-top">
+        <div class="check-box">✓</div>
+        <div class="criteria-info">
+          <div class="check-row-title">淨現值法
+            <div class="tooltip-wrap"><span class="tooltip-icon">?</span><div class="tooltip-box">淨現值 = 所有未來現金流的折現值之和減去初始投資。NPV > 0 表示投資可創造價值。</div></div>
+          </div>
+          <div class="check-row-desc">NPV · 應大於 0</div>
+        </div>
+      </div>
+      <div class="criteria-setting" onclick="event.stopPropagation()">
+        <span class="criteria-cond">折現率</span>
+        <input type="number" id="discount_rate" value="8" min="1" max="30">
+        <span class="criteria-unit">%</span>
+      </div>
+    </div>
+
+    <div class="criteria-card checked" id="cr_bcr" onclick="toggleCriteria(this,'bcr')">
+      <div class="criteria-card-top">
+        <div class="check-box">✓</div>
+        <div class="criteria-info">
+          <div class="check-row-title">本益比（BCR）
+            <div class="tooltip-wrap"><span class="tooltip-icon">?</span><div class="tooltip-box">本益比 = 折現後效益總額 ÷ 折現後成本總額。本益比 > 1 表示效益大於成本。</div></div>
+          </div>
+          <div class="check-row-desc">本益比 · 應大於門檻值</div>
+        </div>
+      </div>
+      <div class="criteria-setting" onclick="event.stopPropagation()">
+        <span class="criteria-cond">門檻 ≥</span>
+        <input type="number" id="bcr_threshold" value="1.0" min="0.1" step="0.1">
+        <span class="criteria-unit">倍</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn-secondary" onclick="goToSection(1)">← 返回修改</button>
+    <button class="btn-submit" onclick="submitSection(2)">確認方法與指標 <span class="arrow">→</span></button>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: INVESTMENT DECISIONS ===== -->
+<section class="section" id="sec3">
+  <div class="section-header">
+    <div class="section-badge">STEP 03</div>
+    <div class="section-title">
+      <h2>設定投資決策方案</h2>
+      <p>請輸入納入影子價格評估的投資方案。每個方案均有預設參數，可依實際情況調整。</p>
+    </div>
+  </div>
+
+  <!-- FILTER BAR (upstream only) -->
+  <div id="invFilterBar" style="display:none;margin-bottom:16px;">
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label" id="filterCatLabel">類別</span>
+        <div class="filter-chips" id="catFilterChips"></div>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-group">
+        <span class="filter-label" id="filterScaleLabel">期初投資成本門檻</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;color:#5a7a6a;">≥</span>
+          <input type="number" id="scaleThresholdInput" value="0" min="0" step="10"
+            oninput="applyFilters()"
+            style="width:90px;padding:5px 8px;font-size:13px;font-family:'IBM Plex Mono',monospace;
+                   text-align:right;border:1px solid #b3bd61;border-radius:6px;background:#ffffff;color:#1b475d;">
+          <span style="font-size:12px;color:#5a7a6a;white-space:nowrap;" id="filterScaleUnit">萬元</span>
+          <button onclick="document.getElementById('scaleThresholdInput').value=0;applyFilters();"
+            style="font-size:11px;color:#8ebd9d;background:none;border:none;cursor:pointer;padding:0 2px;text-decoration:underline;">重置</button>
+        </div>
+      </div>
+      <div class="filter-result" id="filterResult">顯示 5 / 5 項</div>
+    </div>
+  </div>
+
+  <div id="investmentBlocks"></div>
+
+  <button class="add-row-btn" onclick="addInvestment()" id="addInvBtn">＋ 新增原材料</button>
+
+  <div style="margin-top:20px;display:flex;align-items:center;gap:8px;">
+    <div class="hint-btn" onclick="toggleHint('hint3')">💡
+      <div class="hint-popover" id="hint3">
+        <div class="hint-title">💡 填寫提示</div>
+        <strong>採購決策模式：</strong>輸入傳統與低碳材料的單價、年採購量與碳排強度，系統自動計算年溢價成本與年減碳量，再乘以影子價格評估是否值得採用低碳材料。<br><br>
+        <strong>一般投資模式：</strong>預估年減碳量可參考設備供應商數據或能源審計報告。影子價格將乘以此數量計算碳效益。
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn-secondary" onclick="goToSection(2)">← 返回修改</button>
+    <button class="btn-submit" onclick="submitSection(3)">確認投資方案 <span class="arrow">→</span></button>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: PRICE SETTING ===== -->
+<section class="section" id="sec4">
+  <div class="section-header">
+    <div class="section-badge">STEP 04</div>
+    <div class="section-title">
+      <h2>設定影子價格</h2>
+      <p>先決定國際與國內導向的大方向權重，再分別設定各參考點的細項比重與價格區間。</p>
+    </div>
+  </div>
+
+  <!-- LAYER 1: TOP-LEVEL SPLIT -->
+  <div class="card" style="margin-bottom:24px;">
+    <div class="price-section-label">第一層｜國際 vs 國內導向權重</div>
+    <div class="orientation-split">
+      <div class="orient-block dom">
+        <div class="orient-label">🇹🇼 國內導向</div>
+        <div class="orient-pct" id="dom_pct_display">30%</div>
+        <div class="orient-sub">碳費 · 碳社會成本 · 國內同業</div>
+      </div>
+      <div class="orient-slider-wrap">
+        <input type="range" id="intl_weight_slider" min="0" max="100" value="70"
+          oninput="onSliderChange(this.value)" class="orient-slider">
+        <div class="orient-track-labels">
+          <span>全國內</span>
+          <span>各半</span>
+          <span>全國際</span>
+        </div>
+      </div>
+      <div class="orient-block intl">
+        <div class="orient-label">🌐 國際導向</div>
+        <div class="orient-pct" id="intl_pct_display">70%</div>
+        <div class="orient-sub">SCC · ETS · 國際同業</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYER 2: DETAIL WEIGHTS -->
+  <div class="price-detail-grid">
+
+    <div class="card">
+      <div class="price-section-label" style="color:#4ea72e;">🇹🇼 國內導向細項
+        <span id="dom_sub_warn" style="display:none;font-size:11px;color:#c0392b;font-weight:400;margin-left:8px;">細項合計須等於 100%</span>
+      </div>
+      <div class="detail-header-row">
+        <span>參考點</span><span>細項佔比%</span><span>保守值 (元/噸)</span><span>積極值 (元/噸)</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">台灣碳社會成本</span>
+        <input type="number" id="w_tw_scc" value="17" min="0" max="100" oninput="calcPrices()">
+        <input type="number" id="cons_tw_scc" value="10" oninput="calcPrices()">
+        <input type="number" id="aggr_tw_scc" value="40" oninput="calcPrices()">
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">台灣碳費
+          <div class="tooltip-wrap"><span class="tooltip-icon">?</span><div class="tooltip-box">台灣碳費2024年起收取，一般費率NT$300/tCO₂，優惠費率NT$50/tCO₂</div></div>
+        </span>
+        <input type="number" id="w_tw_fee" value="50" min="0" max="100" oninput="calcPrices()">
+        <input type="number" id="cons_tw_fee" value="50" oninput="calcPrices()">
+        <input type="number" id="aggr_tw_fee" value="300" oninput="calcPrices()">
+      </div>
+      <div class="detail-row" style="border:none;">
+        <span class="detail-label">國內同業參考</span>
+        <input type="number" id="w_peer_dom" value="33" min="0" max="100" oninput="calcPrices()">
+        <input type="number" id="cons_peer_dom" value="3000" oninput="calcPrices()">
+        <input type="number" id="aggr_peer_dom" value="10000" oninput="calcPrices()">
+      </div>
+      <div id="dom_custom_rows"></div>
+      <div class="detail-subtotal">
+        <button class="add-row-btn" style="margin:0;padding:4px 10px;font-size:12px;" onclick="addCustomRow('dom')">＋ 新增參考點</button>
+        <span id="dom_sub_total" class="subtotal-num">100%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="price-section-label" style="color:#1b475d;">🌐 國際導向細項
+        <span id="intl_sub_warn" style="display:none;font-size:11px;color:#c0392b;font-weight:400;margin-left:8px;">細項合計須等於 100%</span>
+      </div>
+      <div class="detail-header-row">
+        <span>參考點</span><span>細項佔比%</span><span>保守值 (元/噸)</span><span>積極值 (元/噸)</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">全球碳社會成本 (SCC)</span>
+        <input type="number" id="w_scc" value="29" min="0" max="100" oninput="calcPrices()">
+        <input type="number" id="cons_scc" value="6000" oninput="calcPrices()">
+        <input type="number" id="aggr_scc" value="10000" oninput="calcPrices()">
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">歐盟 ETS 碳價</span>
+        <input type="number" id="w_ets" value="42" min="0" max="100" oninput="calcPrices()">
+        <input type="number" id="cons_ets" value="3000" oninput="calcPrices()">
+        <input type="number" id="aggr_ets" value="3600" oninput="calcPrices()">
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">國際同業參考
+          <div class="tooltip-wrap"><span class="tooltip-icon">?</span><div class="tooltip-box">Honda: ¥15,000/t, BMW: EUR 50–100/t, Forvia: EUR 75/t</div></div>
+        </span>
+        <input type="number" id="w_peer_intl" value="29" min="0" max="100" oninput="calcPrices()">
+        <input type="number" id="cons_peer_intl" value="625" oninput="calcPrices()">
+        <input type="number" id="aggr_peer_intl" value="3600" oninput="calcPrices()">
+      </div>
+      <div id="intl_custom_rows"></div>
+      <div class="detail-subtotal">
+        <button class="add-row-btn" style="margin:0;padding:4px 10px;font-size:12px;" onclick="addCustomRow('intl')">＋ 新增參考點</button>
+        <span id="intl_sub_total" class="subtotal-num">100%</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RESULT -->
+  <div class="card" style="margin-top:20px;">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div class="price-section-label">穩健定價（保守加權平均）</div>
+        <div class="computed-price">
+          <div class="value" id="stable_price">計算中...</div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div class="price-section-label" style="color:#c07d00;">積極定價（積極加權平均）</div>
+        <div class="computed-price">
+          <div class="value aggressive" id="aggr_price">計算中...</div>
+        </div>
+      </div>
+    </div>
+    <div id="weight_warning" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(192,57,43,0.07);border-left:3px solid #c0392b;border-radius:0 6px 6px 0;font-size:13px;color:#c0392b;">
+      ⚠️ 細項比重加總不等於 100%，請確認後再繼續。
+    </div>
+  </div>
+
+  <div style="margin-top:16px;display:flex;align-items:center;gap:8px;">
+    <div class="hint-btn" onclick="toggleHint('hint4')" style="width:32px;height:32px;font-size:16px;">💡
+      <div class="hint-popover" id="hint4" style="width:340px;">
+        <div class="hint-title">💡 業界影子價格參考</div>
+        <div class="ref-chips" style="margin-top:6px;">
+          <div class="ref-chip">Volkswagen <span class="co">EUR 20/t</span></div>
+          <div class="ref-chip">Forvia <span class="co">EUR 75/t</span></div>
+          <div class="ref-chip">BMW <span class="co">EUR 50–100/t</span></div>
+          <div class="ref-chip">SKF <span class="co">SEK 1000/t (~NT$3,200)</span></div>
+          <div class="ref-chip">Honda <span class="co">¥15,000/t (~NT$3,400)</span></div>
+          <div class="ref-chip">Subaru <span class="co">¥6,000/t (~NT$1,400)</span></div>
+          <div class="ref-chip">Safran <span class="co">EUR 80/t</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:24px;">
+    <button class="btn-secondary" onclick="goToSection(3)">← 返回修改</button>
+    <button class="btn-submit" onclick="submitSection(4)">計算模擬結果 <span class="arrow">→</span></button>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: RESULTS ===== -->
+<section class="section" id="sec5">
+  <div class="section-header">
+    <div class="section-badge">STEP 05</div>
+    <div class="section-title">
+      <h2>模擬結果：影子價格效益分析</h2>
+      <p>比較各投資方案在原始情境、穩健影子價格情境、積極影子價格情境下的財務指標表現。</p>
+    </div>
+  </div>
+
+  <div class="summary-banner" id="summaryBanner"></div>
+
+  <div class="threshold-bar" id="thresholdBar" style="display:none;">
+    <span class="threshold-bar-label">評估門檻</span>
+    <div class="threshold-items" id="thresholdItems"></div>
+    <button class="threshold-edit-btn" onclick="goToSection(2)">修改 →</button>
+  </div>
+
+  <div id="resultsTable">
+    <p style="padding:20px;color:var(--text-muted);">請先完成前四步驟的設定。</p>
+  </div>
+
+  <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn-secondary" onclick="goToSection(4)">← 返回調整</button>
+    <button class="gs-btn" onclick="sendToSheets()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg>
+      匯出至 Google Sheets
+    </button>
+    <button class="btn-secondary" onclick="window.print()">🖨️ 列印報告</button>
+  </div>
+
+  <div id="gsStatus" style="margin-top:12px;font-size:13px;color:var(--text-muted);display:none;"></div>
+</section>
+
+</main>
+
+<script>
+// ======= STATE =======
+const state = {
+  target: null,
+  method: 'shadow',
+  criteria: { payback: true, npv: true, bcr: true },
+  investments: [],
+  prices: { stable: 0, aggressive: 0 },
+  completedSections: new Set()
+};
+
+// ======= DEFAULT INVESTMENTS BY TARGET =======
+const defaultInvestmentsByTarget = {
+  scope3_upstream: [
+    {
+      id: 1, active: true,
+      material_name: '熱軋鋼捲',
+      category: '鋼材',
+      annual_qty: 500,        // 年採購量 (噸)
+      unit: '噸',
+      suppliers: [
+        { name: '現有供應商（傳統）', unit_price: 28000, co2_intensity: 2.1, contract_years: 3, is_baseline: true },
+        { name: '供應商 A（綠鋼認證）', unit_price: 32000, co2_intensity: 0.8, contract_years: 3, is_baseline: false },
+        { name: '供應商 B（電弧爐製程）', unit_price: 31000, co2_intensity: 1.1, contract_years: 2, is_baseline: false },
+      ]
+    },
+    {
+      id: 2, active: true,
+      material_name: '鋁合金壓鑄件',
+      category: '鋁件',
+      annual_qty: 120,
+      unit: '噸',
+      suppliers: [
+        { name: '現有供應商（傳統）', unit_price: 72000, co2_intensity: 11.5, contract_years: 3, is_baseline: true },
+        { name: '供應商 C（再生鋁 95%）', unit_price: 81000, co2_intensity: 2.3, contract_years: 3, is_baseline: false },
+      ]
+    },
+    {
+      id: 3, active: true,
+      material_name: '保桿塑料件',
+      category: '塑料件',
+      annual_qty: 80,
+      unit: '噸',
+      suppliers: [
+        { name: '現有供應商（傳統 PP）', unit_price: 45000, co2_intensity: 3.8, contract_years: 2, is_baseline: true },
+        { name: '供應商 D（生質塑料）', unit_price: 52000, co2_intensity: 1.2, contract_years: 2, is_baseline: false },
+      ]
+    },
+    {
+      id: 4, active: true,
+      material_name: '玻璃纖維複合材',
+      category: '複合材料',
+      annual_qty: 40,
+      unit: '噸',
+      suppliers: [
+        { name: '現有供應商（傳統）', unit_price: 95000, co2_intensity: 6.2, contract_years: 3, is_baseline: true },
+        { name: '供應商 E（低碳製程）', unit_price: 108000, co2_intensity: 2.8, contract_years: 5, is_baseline: false },
+        { name: '供應商 F（生物基複材）', unit_price: 112000, co2_intensity: 1.9, contract_years: 3, is_baseline: false },
+      ]
+    },
+    {
+      id: 5, active: true,
+      material_name: '電池陰極材料',
+      category: '電池材料',
+      annual_qty: 15,
+      unit: '噸',
+      suppliers: [
+        { name: '現有供應商（傳統礦源）', unit_price: 380000, co2_intensity: 18.5, contract_years: 3, is_baseline: true },
+        { name: '供應商 G（低碳礦源）', unit_price: 420000, co2_intensity: 6.2, contract_years: 3, is_baseline: false },
+      ]
+    },
+  ],
+  scope12: [
+    {
+      name: '廠區屋頂太陽能系統',
+      cost: 8000000, opex: 50000, years: 20, category: '公用設備｜再生能源',
+      save_elec: 900000, save_fuel: 0, save_carbon_fee: 60000, co2: 280,
+      benefit: 960000, active: true
+    },
+    {
+      name: '製程天然氣鍋爐電氣化',
+      cost: 4500000, opex: 80000, years: 12, category: '製程設備｜電氣化改造',
+      save_elec: 0, save_fuel: 650000, save_carbon_fee: 120000, co2: 210,
+      benefit: 770000, active: true
+    },
+    {
+      name: '能源管理系統（EMS）導入',
+      cost: 1500000, opex: 20000, years: 8, category: '能源管理｜EMS 系統',
+      save_elec: 200000, save_fuel: 50000, save_carbon_fee: 30000, co2: 90,
+      benefit: 280000, active: true
+    },
+    {
+      name: '廠房 LED 照明全面汰換',
+      cost: 800000, opex: 10000, years: 10, category: '公用設備｜節能照明',
+      save_elec: 150000, save_fuel: 0, save_carbon_fee: 15000, co2: 45,
+      benefit: 165000, active: true
+    },
+    {
+      name: '壓縮空氣系統節能改造',
+      cost: 1200000, opex: 15000, years: 8, category: '公用設備｜壓縮空氣',
+      save_elec: 180000, save_fuel: 0, save_carbon_fee: 20000, co2: 55,
+      benefit: 200000, active: true
+    },
+  ],
+  scope3_downstream: [
+    {
+      name: '產品 A',
+      rd_cost: 500000000,            // 研發投資（元）
+      unit_price: 1200000,
+      unit_cost: 850000,
+      annual_sales: 8000,
+      emission_mode: 'calc',
+      emission_gkm: 165,
+      annual_km: 15000,
+      emission_direct: 0,
+      product_life: 6,
+      category: '產品線 A', active: true,
+      cost: 0, benefit: 0, opex: 0, co2: 0, years: 6
+    },
+    {
+      name: '產品 B',
+      rd_cost: 300000000,
+      unit_price: 1500000,
+      unit_cost: 1100000,
+      annual_sales: 5000,
+      emission_mode: 'direct',
+      emission_gkm: 0,
+      annual_km: 15000,
+      emission_direct: 2.1,
+      product_life: 6,
+      category: '產品線 B', active: true,
+      cost: 0, benefit: 0, opex: 0, co2: 0, years: 6
+    },
+    {
+      name: '產品 C',
+      rd_cost: 200000000,
+      unit_price: 1350000,
+      unit_cost: 980000,
+      annual_sales: 4000,
+      emission_mode: 'calc',
+      emission_gkm: 55,
+      annual_km: 15000,
+      emission_direct: 0,
+      product_life: 6,
+      category: '產品線 C', active: true,
+      cost: 0, benefit: 0, opex: 0, co2: 0, years: 6
+    },
+    {
+      name: '產品 D',
+      rd_cost: 800000000,
+      unit_price: 1800000,
+      unit_cost: 1350000,
+      annual_sales: 1500,
+      emission_mode: 'direct',
+      emission_gkm: 0,
+      annual_km: 20000,
+      emission_direct: 3.8,
+      product_life: 8,
+      category: '產品線 D', active: true,
+      cost: 0, benefit: 0, opex: 0, co2: 0, years: 8
+    },
+    {
+      name: '產品 E',
+      rd_cost: 150000000,
+      unit_price: 3500000,
+      unit_cost: 2200000,
+      annual_sales: 800,
+      emission_mode: 'calc',
+      emission_gkm: 210,
+      annual_km: 12000,
+      emission_direct: 0,
+      product_life: 5,
+      category: '產品線 E', active: true,
+      cost: 0, benefit: 0, opex: 0, co2: 0, years: 5
+    },
+  ]
+};
+
+// ======= NAV =======
+let currentSection = 1;
+const maxUnlocked = 1;
+
+function goToSection(n) {
+  if (n > currentSection && !state.completedSections.has(n-1)) return;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec'+n).classList.add('active');
+  currentSection = n;
+  updateNav();
+}
+
+function updateNav() {
+  document.querySelectorAll('.nav-step').forEach(el => {
+    const n = parseInt(el.dataset.step);
+    el.classList.remove('active','done');
+    if (n === currentSection) el.classList.add('active');
+    else if (state.completedSections.has(n)) el.classList.add('done');
+  });
+}
+
+function submitSection(n) {
+  if (n === 1) {
+    if (!state.target) { alert('請選擇一個目標範疇'); return; }
+  } else if (n === 2) {
+    const anyChecked = Object.values(state.criteria).some(v => v);
+    if (!anyChecked) { alert('請至少選擇一個決策指標'); return; }
+  } else if (n === 3) {
+    if (state.investments.length === 0) { alert('請至少新增一個方案'); return; }
+    if (state.target === 'scope3_upstream') {
+      for (const m of state.investments) {
+        if (!m.suppliers || m.suppliers.length < 2) { alert(`「${m.material_name}」至少需要一個基準供應商與一個比較供應商`); return; }
+        if (!m.suppliers.find(s => s.is_baseline)) { alert(`「${m.material_name}」請標記一個供應商為基準`); return; }
+      }
+    }
+  } else if (n === 4) {
+    calcPrices();
+    const g = id => +document.getElementById(id).value || 0;
+    const intlCustomW2 = (customRows.intl||[]).reduce((s,r)=>s+r.w,0);
+    const domCustomW2  = (customRows.dom||[]).reduce((s,r)=>s+r.w,0);
+    const intlSub = g('w_scc')+g('w_ets')+g('w_peer_intl')+intlCustomW2;
+    const domSub  = g('w_tw_scc')+g('w_tw_fee')+g('w_peer_dom')+domCustomW2;
+    if (Math.abs(intlSub-100) > 1 || Math.abs(domSub-100) > 1) {
+      alert(`各組細項佔比加總須等於 100%。
+國際導向：${intlSub}%
+國內導向：${domSub}%`); return;
+    }
+  }
+  state.completedSections.add(n);
+  if (n === 5) return;
+  if (n === 4) { buildResults(); }
+  goToSection(n + 1);
+}
+
+// ======= SECTION 1 =======
+function selectTarget(el, target) {
+  document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.target = target;
+  buildInvestmentBlocks();
+  const btn = document.getElementById('addInvBtn');
+  if (btn) btn.textContent = target === 'scope3_upstream' ? '＋ 新增原材料' : '＋ 新增投資方案';
+}
+
+// ======= SECTION 2 =======
+function selectMethod(el, method) {
+  state.method = method;
+}
+function toggleCriteria(el, key) {
+  el.classList.toggle('checked');
+  state.criteria[key] = el.classList.contains('checked');
+}
+
+// ======= SECTION 3 =======
+function buildInvestmentBlocks() {
+  const defaults = state.target ? defaultInvestmentsByTarget[state.target] : [];
+  state.investments = defaults.map((d,i) => ({...d, id: i, active: true, active: d.active !== false}));
+  renderInvestmentBlocks();
+}
+
+function renderInvestmentBlocks() {
+  const container = document.getElementById('investmentBlocks');
+  container.innerHTML = '';
+  const isUpstream = state.target === 'scope3_upstream';
+  if (isUpstream) {
+    renderUpstreamBlocks(container);
+    showFilterBar(true);
+    applyFilters();
+  } else {
+    renderStandardBlocks(container);
+    if (state.target === 'scope12') {
+      showFilterBar(true);
+      applyFilters();
+    } else {
+      showFilterBar(false);
+    }
+  }
+}
+
+
+// ── FILTER STATE ──
+const filterState = { cats: new Set(['all']) };
+
+function showFilterBar(show) {
+  const bar = document.getElementById('invFilterBar');
+  if (bar) bar.style.display = show ? 'block' : 'none';
+  if (!show) return;
+  const isScope12 = state.target === 'scope12';
+  // Update labels
+  const catLabel = document.getElementById('filterCatLabel');
+  const scaleLabel = document.getElementById('filterScaleLabel');
+  const scaleUnit = document.getElementById('filterScaleUnit');
+  if (catLabel) catLabel.textContent = isScope12 ? '投資類別' : '原物料類別';
+  if (scaleLabel) scaleLabel.textContent = isScope12 ? '期初投資成本門檻' : '年採購金額門檻';
+  if (scaleUnit) scaleUnit.textContent = isScope12 ? '萬元' : '萬元/年';
+  buildCatChips();
+}
+
+function buildCatChips() {
+  const container = document.getElementById('catFilterChips');
+  if (!container) return;
+  const cats = [...new Set(state.investments.map(m => m.category).filter(Boolean))];
+  const allActive = filterState.cats.has('all');
+  container.innerHTML = `
+    <div class="filter-chip cat-chip ${allActive?'active':''}" data-cat="all" onclick="setCatFilter(this,'all')">全部</div>
+    ${cats.map(c => `<div class="filter-chip cat-chip ${(!allActive && filterState.cats.has(c))?'active':''}" data-cat="${c}" onclick="setCatFilter(this,'${c}')">${c}</div>`).join('')}
+  `;
+}
+
+function setCatFilter(el, cat) {
+  if (cat === 'all') {
+    filterState.cats = new Set(['all']);
+  } else {
+    filterState.cats.delete('all');
+    if (filterState.cats.has(cat)) filterState.cats.delete(cat);
+    else filterState.cats.add(cat);
+    if (filterState.cats.size === 0) filterState.cats.add('all');
+  }
+  buildCatChips();
+  applyFilters();
+}
+
+function applyFilters() {
+  const isScope12 = state.target === 'scope12';
+  const blocks = document.querySelectorAll(isScope12 ? '.inv-block' : '.mat-block');
+  let shown = 0;
+  blocks.forEach((block, idx) => {
+    const mat = state.investments[idx];
+    if (!mat) return;
+    const catOk = filterState.cats.has('all') || filterState.cats.has(mat.category);
+    // Scale filter: upstream = annual procurement cost; scope12 = initial investment cost
+    let scaleWan = 0;
+    if (state.target === 'scope12') {
+      scaleWan = (mat.cost || 0) / 10000;
+    } else {
+      const baseline = mat.suppliers && mat.suppliers.find(s => s.is_baseline);
+      scaleWan = baseline ? (baseline.unit_price * mat.annual_qty) / 10000 : 0;
+    }
+    const threshold = +(document.getElementById('scaleThresholdInput')?.value || 0);
+    const scaleOk = scaleWan >= threshold;
+    const visible = catOk && scaleOk;
+    block.classList.toggle('hidden', !visible);
+    if (visible) shown++;
+  });
+  const res = document.getElementById('filterResult');
+  if (res) res.textContent = `顯示 ${shown} / ${state.investments.length} 項`;
+}
+
+// ── UPSTREAM: two-level material → supplier ──
+const MAT_CATEGORIES = ['鋼材','鋁件','塑料件','複合材料','電池材料','玻璃','銅材','橡膠件','電子零件','其他'];
+
+function renderUpstreamBlocks(container) {
+  state.investments.forEach((mat, mIdx) => {
+    const baseline = mat.suppliers.find(s => s.is_baseline) || mat.suppliers[0];
+    const div = document.createElement('div');
+    div.className = 'inv-block mat-block';
+    div.style.opacity = mat.active ? '1' : '0.45';
+
+    // derive summary for active non-baseline suppliers vs baseline
+    const nonBase = mat.suppliers.filter(s => !s.is_baseline);
+    const bestCO2 = nonBase.length ? Math.min(...nonBase.map(s => s.co2_intensity)) : null;
+    const annualCO2saved = bestCO2 !== null ? ((baseline.co2_intensity - bestCO2) * mat.annual_qty).toFixed(1) : '—';
+
+    div.innerHTML = `
+      <div class="mat-block-header">
+        <div class="inv-block-num">${mIdx+1}</div>
+        <div style="flex:1;min-width:0;">
+          <input type="text" value="${mat.material_name}"
+            onchange="upd(${mIdx},'material_name',this.value)"
+            class="mat-name-input" placeholder="原材料名稱">
+          <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap;">
+            <select onchange="upd(${mIdx},'category',this.value)" class="mat-cat-select">
+              ${MAT_CATEGORIES.map(c=>`<option value="${c}" ${mat.category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+            <div class="input-with-unit" style="width:140px;">
+              <input type="number" value="${mat.annual_qty}"
+                onchange="updRender(${mIdx},'annual_qty',+this.value)" style="text-align:right;">
+              <div class="unit-badge">${mat.unit}/年</div>
+            </div>
+            <div class="mat-summary-pill">
+              最大年減碳 <strong>${annualCO2saved}</strong> 噸CO₂e
+            </div>
+          </div>
+        </div>
+        <div class="inv-block-toggle ${mat.active?'on':''}" onclick="toggleInv(${mIdx},this)"></div>
+        <button class="remove-btn" onclick="removeInv(${mIdx})" title="移除此原材料">✕</button>
+      </div>
+
+      <div class="supplier-table-wrap">
+        <table class="supplier-table">
+          <thead>
+            <tr>
+              <th>供應商</th>
+              <th>單價 (元/${mat.unit})</th>
+              <th>碳排強度 (tCO₂e/${mat.unit})</th>
+              <th>合約年限</th>
+              <th>年採購成本</th>
+              <th>年碳排</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sup-tbody-${mIdx}">
+          </tbody>
+        </table>
+        <button class="add-row-btn" style="margin-top:8px;" onclick="addSupplier(${mIdx})">＋ 新增供應商</button>
+      </div>
+    `;
+    container.appendChild(div);
+
+    // Render supplier rows
+    renderSupplierRows(mIdx, mat);
+  });
+}
+
+function renderSupplierRows(mIdx, mat) {
+  const tbody = document.getElementById(`sup-tbody-${mIdx}`);
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  mat.suppliers.forEach((sup, sIdx) => {
+    const annualCost = (sup.unit_price * mat.annual_qty).toLocaleString('zh-TW', {maximumFractionDigits:0});
+    const annualCO2 = (sup.co2_intensity * mat.annual_qty).toFixed(1);
+    const baseline = mat.suppliers.find(s => s.is_baseline);
+    const isBase = sup.is_baseline;
+    const saving = baseline && !isBase
+      ? ((baseline.co2_intensity - sup.co2_intensity) * mat.annual_qty).toFixed(1)
+      : null;
+    const costDelta = baseline && !isBase
+      ? ((sup.unit_price - baseline.unit_price) * mat.annual_qty)
+      : null;
+
+    const tr = document.createElement('tr');
+    tr.className = isBase ? 'sup-row baseline-row' : 'sup-row';
+    tr.innerHTML = `
+      <td>
+        ${isBase ? '<span class="baseline-badge">基準</span>' : ''}
+        <input type="text" value="${sup.name}"
+          onchange="updSupplier(${mIdx},${sIdx},'name',this.value)"
+          class="sup-name-input">
+      </td>
+      <td>
+        <input type="number" value="${sup.unit_price}"
+          onchange="updSupplierRender(${mIdx},${sIdx},'unit_price',+this.value)"
+          class="sup-num-input">
+      </td>
+      <td>
+        <input type="number" value="${sup.co2_intensity}" step="0.1"
+          onchange="updSupplierRender(${mIdx},${sIdx},'co2_intensity',+this.value)"
+          class="sup-num-input">
+      </td>
+      <td style="white-space:nowrap;">
+        <input type="number" value="${sup.contract_years}" min="1"
+          onchange="updSupplier(${mIdx},${sIdx},'contract_years',+this.value)"
+          class="sup-num-input" style="width:52px;">
+        <span style="font-size:12px;color:#8ebd9d;margin-left:4px;">年</span>
+      </td>
+      <td class="sup-calc">
+        NT$ ${annualCost}
+        ${costDelta !== null ? `<br><span class="delta ${costDelta>0?'delta-neg':'delta-pos'}">${costDelta>0?'+':''}${(costDelta/10000).toFixed(1)} 萬/年</span>` : ''}
+      </td>
+      <td class="sup-calc">
+        ${annualCO2} t
+        ${saving !== null ? `<br><span class="delta delta-pos">−${saving} t</span>` : ''}
+      </td>
+      <td>
+        ${!isBase ? `<button class="remove-btn" onclick="removeSupplier(${mIdx},${sIdx})" title="移除">✕</button>` : ''}
+        ${isBase ? '' : `<button class="set-baseline-btn" onclick="setBaseline(${mIdx},${sIdx})" title="設為基準">↑基準</button>`}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function upd(mIdx, key, val) {
+  state.investments[mIdx][key] = val;
+}
+function updRender(mIdx, key, val) {
+  state.investments[mIdx][key] = val;
+  renderInvestmentBlocks();
+}
+function updSupplier(mIdx, sIdx, key, val) {
+  state.investments[mIdx].suppliers[sIdx][key] = val;
+}
+function updSupplierRender(mIdx, sIdx, key, val) {
+  state.investments[mIdx].suppliers[sIdx][key] = val;
+  renderSupplierRows(mIdx, state.investments[mIdx]);
+}
+function addSupplier(mIdx) {
+  state.investments[mIdx].suppliers.push({
+    name: '新供應商', unit_price: 30000, co2_intensity: 1.5, contract_years: 3, is_baseline: false
+  });
+  renderInvestmentBlocks();
+}
+function removeSupplier(mIdx, sIdx) {
+  state.investments[mIdx].suppliers.splice(sIdx, 1);
+  renderInvestmentBlocks();
+}
+function setBaseline(mIdx, sIdx) {
+  state.investments[mIdx].suppliers.forEach(s => s.is_baseline = false);
+  state.investments[mIdx].suppliers[sIdx].is_baseline = true;
+  renderInvestmentBlocks();
+}
+
+// ── STANDARD (scope12 / downstream) ──
+function renderStandardBlocks(container) {
+  const isScope12 = state.target === 'scope12';
+  const scope12Categories = [
+    // 公用設備
+    '公用設備｜再生能源','公用設備｜節能照明','公用設備｜空調暖通','公用設備｜壓縮空氣',
+    '公用設備｜熱能回收','公用設備｜電力系統',
+    // 製程設備
+    '製程設備｜電氣化改造','製程設備｜燃料替代','製程設備｜製程優化',
+    '製程設備｜熱處理設備','製程設備｜輸送設備',
+    // 能源管理
+    '能源管理｜EMS 系統','能源管理｜監測儀表','能源管理｜智慧控制',
+    // 建築設施
+    '建築設施｜隔熱改善','建築設施｜綠建築改造',
+    // 其他
+    '其他',
+  ];
+  const downstreamCategories = ['產品線 A','產品線 B','產品線 C','產品線 D','產品線 E','其他'];
+  const invCategories = isScope12 ? scope12Categories : downstreamCategories;
+
+  state.investments.forEach((inv, idx) => {
+    // For scope12, derive benefit from sub-items
+    if (isScope12) {
+      inv.benefit = (inv.save_elec||0) + (inv.save_fuel||0) + (inv.save_carbon_fee||0);
+    }
+
+    const div = document.createElement('div');
+    div.className = 'inv-block';
+
+    const isDownstream = state.target === 'scope3_downstream';
+
+    // For downstream, compute emission per unit and profit metrics
+    if (isDownstream) {
+      const emTCO2 = inv.emission_mode === 'calc'
+        ? (inv.emission_gkm * (inv.annual_km||15000)) / 1e6
+        : (inv.emission_direct || 0);
+      inv._emTCO2 = emTCO2; // tCO2e/單位
+      inv.co2 = emTCO2 * inv.annual_sales;
+      inv.benefit = (inv.unit_price - inv.unit_cost) * inv.annual_sales;
+      inv.cost = 0;
+      inv.opex = 0;
+      inv.years = inv.product_life || inv.model_years || 6;
+    }
+
+    const scope12Fields = isScope12 ? `
+      <div class="col-half">
+        <div class="input-group">
+          <label>期初投資成本</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.cost}" onchange="updateInv(${idx},'cost',+this.value)">
+            <div class="unit-badge">元</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年維運費用</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.opex}" onchange="updateInv(${idx},'opex',+this.value)">
+            <div class="unit-badge">元/年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>投資效益年限</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.years}" onchange="updateInv(${idx},'years',+this.value)">
+            <div class="unit-badge">年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>投資類別</label>
+          <select onchange="updateInv(${idx},'category',this.value)">
+            ${invCategories.map(c=>`<option value="${c}" ${inv.category===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="col-half">
+        <div class="input-group">
+          <label>年電費節省</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.save_elec||0}" onchange="updateInvAndRender(${idx},'save_elec',+this.value)">
+            <div class="unit-badge">元/年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年燃料費節省</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.save_fuel||0}" onchange="updateInvAndRender(${idx},'save_fuel',+this.value)">
+            <div class="unit-badge">元/年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年碳費節省</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.save_carbon_fee||0}" onchange="updateInvAndRender(${idx},'save_carbon_fee',+this.value)">
+            <div class="unit-badge">元/年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>預估年減碳量</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.co2}" onchange="updateInv(${idx},'co2',+this.value)">
+            <div class="unit-badge">噸CO₂e</div>
+          </div>
+        </div>
+        <div style="background:#fff5d2;border:1px solid #b3bd61;border-radius:8px;padding:10px 14px;margin-top:4px;">
+          <div style="font-size:11px;color:#5a7a6a;font-weight:600;margin-bottom:4px;">年總效益（自動加總）</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:#1b475d;">
+            NT$ ${((inv.save_elec||0)+(inv.save_fuel||0)+(inv.save_carbon_fee||0)).toLocaleString('zh-TW')} 元/年
+          </div>
+        </div>
+      </div>
+    ` : isDownstream ? `
+      <div class="col-half">
+        <div class="input-group">
+          <label>產品名稱</label>
+          <input type="text" value="${inv.name}" onchange="updateInv(${idx},'name',this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #b3bd61;border-radius:8px;font-size:14px;color:#1b475d;background:#fff;">
+        </div>
+        <div class="input-group">
+          <label>排放量輸入方式</label>
+          <select onchange="updateInvAndRender(${idx},'emission_mode',this.value)">
+            <option value="calc"  ${inv.emission_mode==='calc'  ?'selected':''}>g CO₂/km × 年里程 自動換算</option>
+            <option value="direct"${inv.emission_mode==='direct'?'selected':''}>直接輸入 tCO₂e/輛</option>
+          </select>
+        </div>
+        ${inv.emission_mode === 'calc' ? `
+        <div class="input-group">
+          <label>油耗排放強度</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.emission_gkm}" onchange="updateInvAndRender(${idx},'emission_gkm',+this.value)">
+            <div class="unit-badge">g CO₂/km</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年使用里程 / 行駛里程</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.annual_km||15000}" onchange="updateInvAndRender(${idx},'annual_km',+this.value)">
+            <div class="unit-badge">km / 年</div>
+          </div>
+        </div>` : `
+        <div class="input-group">
+          <label>每單位排放量（使用階段）</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.emission_direct||0}" step="0.1" onchange="updateInvAndRender(${idx},'emission_direct',+this.value)">
+            <div class="unit-badge">tCO₂e/單位</div>
+          </div>
+        </div>`}
+      </div>
+      <div class="col-half">
+        <div class="input-group">
+          <label>前期研發投資</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.rd_cost||0}" onchange="updateInvAndRender(${idx},'rd_cost',+this.value)">
+            <div class="unit-badge">元</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>產品售價</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.unit_price}" onchange="updateInvAndRender(${idx},'unit_price',+this.value)">
+            <div class="unit-badge">元/單位</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>產品成本</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.unit_cost}" onchange="updateInvAndRender(${idx},'unit_cost',+this.value)">
+            <div class="unit-badge">元/單位</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年銷售量（單位）</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.annual_sales}" onchange="updateInvAndRender(${idx},'annual_sales',+this.value)">
+            <div class="unit-badge">單位/年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>產品生命週期</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.product_life||inv.model_years||6}" onchange="updateInvAndRender(${idx},'product_life',+this.value)">
+            <div class="unit-badge">年</div>
+          </div>
+        </div>
+        <div style="background:#fff5d2;border:1px solid #b3bd61;border-radius:8px;padding:10px 14px;margin-top:4px;">
+          <div style="font-size:11px;color:#5a7a6a;font-weight:600;margin-bottom:6px;">自動計算</div>
+          <div style="font-size:12px;color:#1b475d;line-height:2;">
+            每單位排放：<strong style="font-family:'IBM Plex Mono',monospace;">${inv._emTCO2?.toFixed(3)||'—'} tCO₂e</strong><br>
+            年利潤（無碳價）：<strong style="font-family:'IBM Plex Mono',monospace;">NT$ ${(((inv.unit_price-inv.unit_cost)*inv.annual_sales)/10000).toFixed(0)} 萬</strong><br>
+            年總碳排：<strong style="font-family:'IBM Plex Mono',monospace;">${inv._emTCO2 ? (inv._emTCO2*inv.annual_sales).toFixed(0) : '—'} tCO₂e</strong><br>
+            研發回收年限（無碳價）：<strong style="font-family:'IBM Plex Mono',monospace;">${inv.rd_cost && (inv.unit_price-inv.unit_cost)*inv.annual_sales > 0 ? ((inv.rd_cost/((inv.unit_price-inv.unit_cost)*inv.annual_sales)).toFixed(1)+' 年') : '—'}</strong>
+          </div>
+        </div>
+      </div>
+    ` : `
+      <div class="col-half">
+        <div class="input-group">
+          <label>期初投資成本 (NTD)</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.cost}" onchange="updateInv(${idx},'cost',+this.value)">
+            <div class="unit-badge">元</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年預期效益 (NTD)</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.benefit}" onchange="updateInv(${idx},'benefit',+this.value)">
+            <div class="unit-badge">元/年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>年維運費用 (NTD)</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.opex}" onchange="updateInv(${idx},'opex',+this.value)">
+            <div class="unit-badge">元/年</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-half">
+        <div class="input-group">
+          <label>預估年減碳量</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.co2}" onchange="updateInv(${idx},'co2',+this.value)">
+            <div class="unit-badge">噸CO₂e</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>投資效益年限</label>
+          <div class="input-with-unit">
+            <input type="number" value="${inv.years}" onchange="updateInv(${idx},'years',+this.value)">
+            <div class="unit-badge">年</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>投資類別</label>
+          <select onchange="updateInv(${idx},'category',this.value)">
+            ${invCategories.map(c=>`<option value="${c}" ${inv.category===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    `;
+
+    div.innerHTML = `
+      <div class="inv-block-header">
+        <div class="inv-block-num">${idx+1}</div>
+        <div class="inv-block-title">
+          <input type="text" value="${inv.name}" onchange="updateInv(${idx},'name',this.value)"
+            style="background:transparent;border:none;font-size:15px;font-weight:600;color:var(--text);width:100%;padding:0;font-family:'Noto Sans TC',sans-serif;">
+        </div>
+        <div class="inv-block-toggle ${inv.active?'on':''}" onclick="toggleInv(${idx},this)"></div>
+        <button class="remove-btn" onclick="removeInv(${idx})" title="移除">✕</button>
+      </div>
+      <div class="row" style="opacity:${inv.active?1:0.4};transition:opacity 0.2s;">
+        ${scope12Fields}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function updateInvAndRender(idx, key, val) {
+  state.investments[idx][key] = val;
+  renderInvestmentBlocks();
+}
+function updateInv(idx, key, val) {
+  state.investments[idx][key] = val;
+}
+function toggleInv(idx, el) {
+  state.investments[idx].active = !state.investments[idx].active;
+  el.classList.toggle('on');
+  renderInvestmentBlocks();
+}
+function removeInv(idx) {
+  state.investments.splice(idx, 1);
+  renderInvestmentBlocks();
+}
+function addInvestment() {
+  const isUpstream = state.target === 'scope3_upstream';
+  if (isUpstream) {
+    state.investments.push({
+      id: Date.now(), active: true,
+      material_name: '新原材料', category: '鋼材',
+      annual_qty: 100, unit: '噸',
+      suppliers: [
+        { name: '現有供應商（基準）', unit_price: 30000, co2_intensity: 2.0, contract_years: 3, is_baseline: true },
+        { name: '低碳供應商', unit_price: 34000, co2_intensity: 0.8, contract_years: 3, is_baseline: false },
+      ]
+    });
+  } else if (state.target === 'scope12') {
+    state.investments.push({
+      id: Date.now(), name: '新減碳投資', active: true,
+      cost: 1000000, opex: 20000, years: 8, category: '再生能源',
+      save_elec: 0, save_fuel: 0, save_carbon_fee: 0, co2: 0, benefit: 0
+    });
+  } else if (state.target === 'scope3_downstream') {
+    state.investments.push({
+      id: Date.now(), name: '新產品', active: true,
+      rd_cost: 100000000,
+      unit_price: 1000000, unit_cost: 700000,
+      annual_sales: 3000, emission_mode: 'calc',
+      emission_gkm: 150, annual_km: 15000, emission_direct: 0,
+      product_life: 6, category: '產品線',
+      cost: 0, benefit: 0, opex: 0, co2: 0, years: 6
+    });
+  } else {
+    state.investments.push({
+      id: Date.now(), name: '新投資方案', cost: 1000000, benefit: 150000,
+      opex: 20000, co2: 50, years: 8, category: '其他', active: true
+    });
+  }
+  renderInvestmentBlocks();
+}
+
+// ======= SECTION 4 PRICE CALC =======
+function onSliderChange(val) {
+  val = +val;          // intl %
+  const domVal = 100 - val;  // dom %
+  document.getElementById('intl_pct_display').textContent = val + '%';
+  document.getElementById('dom_pct_display').textContent = domVal + '%';
+  // Left side = domestic (green), right side = international (blue)
+  // slider value goes left→right = 0→100 = dom→intl
+  const slider = document.getElementById('intl_weight_slider');
+  slider.style.background = `linear-gradient(to right, #4ea72e 0%, #4ea72e ${val}%, #1b475d ${val}%, #1b475d 100%)`;
+  calcPrices();
+}
+
+function calcPrices() {
+  const g = id => +document.getElementById(id).value || 0;
+  const intlW = (+document.getElementById('intl_weight_slider').value) / 100;
+  const domW = 1 - intlW;
+
+  // Sub-totals (each group sums to 100 internally, then scaled by top-level weight)
+  const intlSub = g('w_scc') + g('w_ets') + g('w_peer_intl') + (customRows.intl||[]).reduce((s,r)=>s+r.w,0);
+  const domSub  = g('w_tw_scc') + g('w_tw_fee') + g('w_peer_dom') + (customRows.dom||[]).reduce((s,r)=>s+r.w,0);
+
+  // Effective weight of each item = (sub% / 100) * top-level weight
+  const eff = (subPct, topW) => subPct / 100 * topW;
+
+  // Custom rows contribution
+  const intlCustomStable = (customRows.intl || []).reduce((s,r) => s + r.cons * eff(r.w, intlW), 0);
+  const intlCustomAggr   = (customRows.intl || []).reduce((s,r) => s + r.aggr * eff(r.w, intlW), 0);
+  const domCustomStable  = (customRows.dom  || []).reduce((s,r) => s + r.cons * eff(r.w, domW), 0);
+  const domCustomAggr    = (customRows.dom  || []).reduce((s,r) => s + r.aggr * eff(r.w, domW), 0);
+  const intlCustomW = (customRows.intl || []).reduce((s,r) => s + r.w, 0);
+  const domCustomW  = (customRows.dom  || []).reduce((s,r) => s + r.w, 0);
+
+  const stablePrice =
+    g('cons_scc')       * eff(g('w_scc'), intlW) +
+    g('cons_ets')       * eff(g('w_ets'), intlW) +
+    g('cons_peer_intl') * eff(g('w_peer_intl'), intlW) +
+    g('cons_tw_scc')    * eff(g('w_tw_scc'), domW) +
+    g('cons_tw_fee')    * eff(g('w_tw_fee'), domW) +
+    g('cons_peer_dom')  * eff(g('w_peer_dom'), domW) +
+    intlCustomStable + domCustomStable;
+
+  const aggrPrice =
+    g('aggr_scc')       * eff(g('w_scc'), intlW) +
+    g('aggr_ets')       * eff(g('w_ets'), intlW) +
+    g('aggr_peer_intl') * eff(g('w_peer_intl'), intlW) +
+    g('aggr_tw_scc')    * eff(g('w_tw_scc'), domW) +
+    g('aggr_tw_fee')    * eff(g('w_tw_fee'), domW) +
+    g('aggr_peer_dom')  * eff(g('w_peer_dom'), domW) +
+    intlCustomAggr + domCustomAggr;
+
+  state.prices.stable = stablePrice;
+  state.prices.aggressive = aggrPrice;
+
+  document.getElementById('stable_price').textContent = `NT$ ${stablePrice.toLocaleString('zh-TW',{maximumFractionDigits:0})} / 噸`;
+  document.getElementById('aggr_price').textContent = `NT$ ${aggrPrice.toLocaleString('zh-TW',{maximumFractionDigits:0})} / 噸`;
+
+  // Sub-total displays
+  const intlSubEl = document.getElementById('intl_sub_total');
+  const domSubEl  = document.getElementById('dom_sub_total');
+  intlSubEl.textContent = intlSub + '%';
+  domSubEl.textContent  = domSub + '%';
+  intlSubEl.className = 'subtotal-num' + (Math.abs(intlSub-100) > 1 ? ' bad' : '');
+  domSubEl.className  = 'subtotal-num' + (Math.abs(domSub-100) > 1 ? ' bad' : '');
+  document.getElementById('intl_sub_warn').style.display = Math.abs(intlSub-100) > 1 ? 'inline' : 'none';
+  document.getElementById('dom_sub_warn').style.display  = Math.abs(domSub-100) > 1 ? 'inline' : 'none';
+
+  const warn = document.getElementById('weight_warning');
+  warn.style.display = (Math.abs(intlSub-100) > 1 || Math.abs(domSub-100) > 1) ? 'block' : 'none';
+}
+
+// ======= RESULTS =======
+function calcMetrics(inv, carbonPrice) {
+  // For downstream: profit = (unit_price - unit_cost - carbonPrice×emTCO2) × annual_sales
+  // R&D investment (rd_cost) is the upfront cost recovered over product_life years
+  if (inv.unit_price !== undefined && inv.annual_sales !== undefined) {
+    const emTCO2 = inv.emission_mode === 'calc'
+      ? (inv.emission_gkm * (inv.annual_km||15000)) / 1e6
+      : (inv.emission_direct || 0);
+    inv._emTCO2 = emTCO2;
+    inv.co2 = emTCO2 * inv.annual_sales;
+
+    const rdCost = inv.rd_cost || 0;
+    const baseProfitPerUnit = inv.unit_price - inv.unit_cost;
+    const annualProfitOrig  = baseProfitPerUnit * inv.annual_sales;
+    const annualProfitAdj   = (baseProfitPerUnit - carbonPrice * emTCO2) * inv.annual_sales;
+    const carbonCostPerUnit = carbonPrice * emTCO2;
+    const years = inv.product_life || inv.model_years || 6;
+    const dr = (+document.getElementById('discount_rate')?.value || 8) / 100;
+
+    // Payback: years to recover rd_cost from annual profit
+    const payback_orig = rdCost > 0 && annualProfitOrig > 0 ? rdCost / annualProfitOrig : (annualProfitOrig > 0 ? 0 : Infinity);
+    const payback_adj  = rdCost > 0 && annualProfitAdj  > 0 ? rdCost / annualProfitAdj  : (annualProfitAdj  > 0 ? 0 : Infinity);
+
+    // NPV: -rdCost + PV of annual profits over product_life
+    let npv_orig = -rdCost, npv_adj = -rdCost;
+    let pv_profit_orig = 0, pv_profit_adj = 0, pv_cost = rdCost;
+    for (let t = 1; t <= years; t++) {
+      const disc = Math.pow(1+dr, t);
+      npv_orig += annualProfitOrig / disc;
+      npv_adj  += annualProfitAdj  / disc;
+      pv_profit_orig += annualProfitOrig / disc;
+      pv_profit_adj  += annualProfitAdj  / disc;
+    }
+
+    // BCR: PV of profits / rd_cost (or 1 if no rd_cost)
+    const bcr_orig = rdCost > 0 ? pv_profit_orig / rdCost : (annualProfitOrig > 0 ? Infinity : 0);
+    const bcr_adj  = rdCost > 0 ? pv_profit_adj  / rdCost : (annualProfitAdj  > 0 ? Infinity : 0);
+
+    return {
+      _isDownstream: true,
+      annualProfitOrig, annualProfitAdj,
+      profitDelta: annualProfitAdj - annualProfitOrig,
+      carbonCostPerUnit, carbonCostTotal: carbonCostPerUnit * inv.annual_sales,
+      rdCost, npv_orig, npv_adj,
+      payback_orig, payback_adj,
+      bcr_orig, bcr_adj,
+      co2: inv.co2, emTCO2,
+      carbonBenefit: -(carbonCostPerUnit * inv.annual_sales),
+    };
+  }
+  // For scope12, derive benefit from save_ sub-fields
+  if (!inv.suppliers && (inv.save_elec !== undefined)) {
+    inv.benefit = (inv.save_elec||0) + (inv.save_fuel||0) + (inv.save_carbon_fee||0);
+  }
+  // For upstream, derive cost/benefit/co2 from best non-baseline supplier
+  let cost = inv.cost, benefit = inv.benefit, opex = inv.opex, co2 = inv.co2, years = inv.years;
+  if (inv.suppliers) {
+    const baseline = inv.suppliers.find(s => s.is_baseline) || inv.suppliers[0];
+    const candidates = inv.suppliers.filter(s => !s.is_baseline);
+    if (candidates.length === 0) return null;
+    // Use best carbon supplier (lowest intensity) for main metrics
+    const best = candidates.reduce((a,b) => a.co2_intensity < b.co2_intensity ? a : b);
+    const premiumPerUnit = best.unit_price - baseline.unit_price;
+    const qty = inv.annual_qty || 0;
+    cost  = premiumPerUnit > 0 ? premiumPerUnit * qty * best.contract_years : 0;
+    opex  = premiumPerUnit * qty;
+    benefit = 0;
+    co2   = (baseline.co2_intensity - best.co2_intensity) * qty;
+    years = best.contract_years;
+  }
+  const netAnnual = benefit - opex;
+  const carbonBenefit = co2 * carbonPrice;
+  const adjAnnual = netAnnual + carbonBenefit;
+  const dr = (+document.getElementById('discount_rate').value || 8) / 100;
+
+  // Payback — use local cost/years (not inv.cost which may be stale 0 for upstream)
+  const payback_orig = netAnnual !== 0 ? cost / Math.abs(netAnnual) : Infinity;
+  const payback_adj  = adjAnnual !== 0 ? cost / Math.abs(adjAnnual) : Infinity;
+
+  // NPV — use local cost/years/benefit
+  let npv_orig = -cost;
+  let npv_adj  = -cost;
+  for (let t = 1; t <= years; t++) {
+    npv_orig += netAnnual  / Math.pow(1+dr, t);
+    npv_adj  += adjAnnual  / Math.pow(1+dr, t);
+  }
+
+  // BCR — use local cost/opex/benefit/years
+  let pv_benefits_orig = 0, pv_benefits_adj = 0;
+  let pv_costs = cost;
+  for (let t = 1; t <= years; t++) {
+    pv_benefits_orig += benefit                     / Math.pow(1+dr, t);
+    pv_benefits_adj  += (benefit + carbonBenefit)   / Math.pow(1+dr, t);
+    pv_costs         += opex                        / Math.pow(1+dr, t);
+  }
+  const bcr_orig = pv_costs !== 0 ? pv_benefits_orig / pv_costs : 0;
+  const bcr_adj  = pv_costs !== 0 ? pv_benefits_adj  / pv_costs : 0;
+
+  return { payback_orig, payback_adj, npv_orig, npv_adj, bcr_orig, bcr_adj, carbonBenefit, co2 };
+}
+
+// ── per-supplier metrics for upstream ──
+function calcMetricsForSupplier(mat, supplier, carbonPrice) {
+  // ── New logic ──
+  // Carbon-adjusted annual cost = unit_price × qty + co2_intensity × qty × carbonPrice
+  // Compare supplier vs baseline on this basis.
+  //
+  // annualCostDelta = adjCost(supplier) - adjCost(baseline)
+  //   negative = switching is CHEAPER (saves money) → good
+  //   positive = switching is more expensive even after carbon → bad
+  //
+  // For payback: if the supplier has a higher unit price (purchase premium),
+  // that premium is recouped through carbon cost savings over the contract period.
+  //
+  // Scenarios:
+  //   orig:   carbonPrice = 0  → delta = pure purchase price difference
+  //   stable/aggr: carbonPrice > 0  → delta includes carbon cost adjustment
+
+  const baseline = mat.suppliers.find(s => s.is_baseline) || mat.suppliers[0];
+  const qty = mat.annual_qty || 0;
+  const years = supplier.contract_years;
+  const dr = (+document.getElementById('discount_rate').value || 8) / 100;
+
+  // Annual carbon-adjusted total cost for each supplier
+  const adjCostSup  = (cp) => (supplier.unit_price  + supplier.co2_intensity  * cp) * qty;
+  const adjCostBase = (cp) => (baseline.unit_price   + baseline.co2_intensity  * cp) * qty;
+
+  // Annual cost delta (negative = switching saves money)
+  const deltaCp = (cp) => adjCostSup(cp) - adjCostBase(cp);
+
+  const deltaOrig   = deltaCp(0);          // pure purchase premium, no carbon
+  const deltaAdj    = deltaCp(carbonPrice); // with shadow price applied
+
+  // Purchase premium (ignoring carbon): how much more per year does this supplier cost?
+  const purchasePremium = (supplier.unit_price - baseline.unit_price) * qty;
+
+  // Carbon saving per year: baseline carbon cost - supplier carbon cost
+  const annualCarbonSaving = (baseline.co2_intensity - supplier.co2_intensity) * qty * carbonPrice;
+
+  // ── Payback ──
+  // Investment = purchase premium × years (extra spend over contract vs baseline)
+  // But if the supplier is cheaper to buy (purchasePremium ≤ 0), payback = 0 immediately.
+  // Annual "return" = carbon cost saving (annualCarbonSaving).
+  // Payback = purchasePremium × years / annualCarbonSaving
+  // (For orig, carbonPrice = 0 → annualCarbonSaving = 0 → payback = ∞ if premium > 0)
+
+  const investment = Math.max(purchasePremium, 0) * years;
+
+  const payback_orig = purchasePremium <= 0 ? 0
+    : Infinity; // no carbon price → carbon saving = 0 → never recoups purchase premium
+
+  const annualCarbonSavingAdj = (baseline.co2_intensity - supplier.co2_intensity) * qty * carbonPrice;
+  const payback_adj = purchasePremium <= 0 ? 0
+    : annualCarbonSavingAdj > 0 ? investment / annualCarbonSavingAdj
+    : Infinity;
+
+  // ── NPV ──
+  // Each year: net cash flow = -deltaAdj (negative delta = positive cash flow for us)
+  // i.e. if switching saves NT$X/year, that's +X cash flow vs baseline
+  let npv_orig = 0, npv_adj = 0;
+  for (let t = 1; t <= years; t++) {
+    const disc = Math.pow(1 + dr, t);
+    npv_orig += (-deltaOrig)  / disc; // annual saving vs baseline (orig)
+    npv_adj  += (-deltaAdj)   / disc; // annual saving vs baseline (with carbon)
+  }
+
+  // ── BCR (本益比) ──
+  // Benefit = PV of carbon cost savings (vs baseline)
+  // Cost    = PV of purchase premium (vs baseline), if any
+  let pv_carbon_saving = 0, pv_purchase_premium = 0;
+  for (let t = 1; t <= years; t++) {
+    const disc = Math.pow(1 + dr, t);
+    pv_carbon_saving    += Math.max(annualCarbonSavingAdj, 0) / disc;
+    pv_purchase_premium += Math.max(purchasePremium, 0)       / disc;
+  }
+
+  const bcr_orig = 0; // no carbon price → no benefit from carbon → BCR = 0 if premium > 0
+  const bcr_adj  = pv_purchase_premium > 0
+    ? pv_carbon_saving / pv_purchase_premium
+    : (annualCarbonSavingAdj >= 0 ? Infinity : 0);
+
+  const co2saved = (baseline.co2_intensity - supplier.co2_intensity) * qty;
+
+  return {
+    payback_orig, payback_adj,
+    npv_orig, npv_adj,
+    bcr_orig, bcr_adj,
+    deltaOrig, deltaAdj,          // annual cost delta vs baseline
+    purchasePremium,
+    annualCarbonSaving: annualCarbonSavingAdj,
+    co2: co2saved,
+    carbonBenefit: annualCarbonSavingAdj,
+    cost: investment,
+    annualPremium: purchasePremium,
+    years
+  };
+}
+
+function buildResults() {
+  const isUpstream = state.target === 'scope3_upstream';
+  const activeInvs = state.investments.filter(i => i.active);
+  const sp = state.prices.stable;
+  const ap = state.prices.aggressive;
+  const payback_thresh = +document.getElementById('payback_threshold').value || 7;
+  const bcr_thresh = +document.getElementById('bcr_threshold').value || 1;
+
+  const passFn = (m) => {
+    let ok = true;
+    if (state.criteria.payback) ok = ok && (isFinite(m.payback_adj) ? m.payback_adj <= payback_thresh : false);
+    if (state.criteria.npv) ok = ok && m.npv_adj > 0;
+    if (state.criteria.bcr) ok = ok && m.bcr_adj >= bcr_thresh;
+    return ok;
+  };
+
+  const metricPassColor = (val, label) => {
+    if (label === '回收年限 (年)') return isFinite(val) && val <= payback_thresh ? '#2d7a1a' : '#c0392b';
+    if (label === 'NPV (萬元)')    return val > 0  ? '#2d7a1a' : '#c0392b';
+    if (label === '本益比')        return val >= bcr_thresh ? '#2d7a1a' : '#c0392b';
+    return '#5a7a6a';
+  };
+
+  // Summary KPIs
+  let totalRows = 0, passStable = 0, passAggr = 0;
+  if (isUpstream) {
+    activeInvs.forEach(mat => {
+      (mat.suppliers||[]).filter(s=>!s.is_baseline).forEach(sup => {
+        totalRows++;
+        if (passFn(calcMetricsForSupplier(mat, sup, sp))) passStable++;
+        if (passFn(calcMetricsForSupplier(mat, sup, ap))) passAggr++;
+      });
+    });
+  } else {
+    activeInvs.forEach(inv => {
+      totalRows++;
+      const ms = calcMetrics(inv, sp);
+      const ma = calcMetrics(inv, ap);
+      if (ms && passFn(ms)) passStable++;
+      if (ma && passFn(ma)) passAggr++;
+    });
+  }
+
+  // Show threshold bar
+  const thresholdBar = document.getElementById('thresholdBar');
+  const thresholdItems = document.getElementById('thresholdItems');
+  if (thresholdBar && thresholdItems) {
+    thresholdBar.style.display = 'flex';
+    const paybackOn = state.criteria.payback;
+    const npvOn     = state.criteria.npv;
+    const bcrOn     = state.criteria.bcr;
+    const dr        = +document.getElementById('discount_rate').value || 8;
+    thresholdItems.innerHTML = `
+      <div class="threshold-item ${paybackOn ? '' : 'disabled'}">
+        <span class="t-name">回收年限</span>
+        <span class="t-val">≤ ${paybackOn ? payback_thresh + ' 年' : '未啟用'}</span>
+      </div>
+      <div class="threshold-item ${npvOn ? '' : 'disabled'}">
+        <span class="t-name">NPV</span>
+        <span class="t-val">${npvOn ? '> 0　折現率 ' + dr + '%' : '未啟用'}</span>
+      </div>
+      <div class="threshold-item ${bcrOn ? '' : 'disabled'}">
+        <span class="t-name">本益比</span>
+        <span class="t-val">≥ ${bcrOn ? bcr_thresh : '未啟用'}</span>
+      </div>
+    `;
+  }
+
+  document.getElementById('summaryBanner').innerHTML = `
+    <div class="summary-kpi"><div class="kpi-label">本年度決策項目數</div><div class="kpi-value green">${totalRows}</div></div>
+    <div class="summary-kpi"><div class="kpi-label">穩健定價</div><div class="kpi-value blue">NT$ ${sp.toLocaleString('zh-TW',{maximumFractionDigits:0})} / 噸</div></div>
+    <div class="summary-kpi"><div class="kpi-label">積極定價</div><div class="kpi-value amber">NT$ ${ap.toLocaleString('zh-TW',{maximumFractionDigits:0})} / 噸</div></div>
+    <div class="summary-kpi"><div class="kpi-label">穩健情境通過</div><div class="kpi-value green">${passStable} / ${totalRows}</div></div>
+    <div class="summary-kpi"><div class="kpi-label">積極情境通過</div><div class="kpi-value amber">${passAggr} / ${totalRows}</div></div>
+  `;
+
+  // Column headers
+  const colHeaders = [];
+  if (state.criteria.payback) colHeaders.push('回收年限 (年)');
+  if (state.criteria.npv) colHeaders.push('淨現值 NPV (萬元)');
+  if (state.criteria.bcr) colHeaders.push('本益比');
+
+  const fmt = (v, isNPV=false) => {
+    if (v === undefined || v === null || !isFinite(v) || isNaN(v)) return '—';
+    if (isNPV) return Math.round(v/10000).toLocaleString('zh-TW');
+    return v.toFixed(2);
+  };
+  const fmtN = (v, decimals=1) => {
+    if (v === undefined || v === null || isNaN(v)) return '—';
+    return (+v).toFixed(decimals);
+  };
+  const fmtWan = (v) => {
+    if (v === undefined || v === null || isNaN(v)) return '—';
+    return Math.round(v/10000).toLocaleString('zh-TW');
+  };
+  const passIcon = (pass, label) => `<span style="font-size:11px;font-weight:700;color:${pass?'#2d7a1a':'#c0392b'};">${pass?'✓':'✗'} ${label}</span>`;
+
+  // ── render as card list (not table) for cleaner layout ──
+  let html = '';
+
+  if (isUpstream) {
+    activeInvs.forEach((mat) => {
+      const nonBase = (mat.suppliers||[]).filter(s => !s.is_baseline);
+      if (nonBase.length === 0) return;
+      const baseline = mat.suppliers.find(s => s.is_baseline) || mat.suppliers[0];
+
+      // Baseline hidden carbon cost rows
+      const baseAnnualCO2 = baseline.co2_intensity * mat.annual_qty;
+      const baseHiddenCostStable = baseAnnualCO2 * sp;   // NT$
+      const baseHiddenCostAggr   = baseAnnualCO2 * ap;
+
+      html += `<div class="res-mat-group">
+        <div class="res-mat-header">
+          <span class="res-mat-icon">📦</span>
+          <div>
+            <div class="res-mat-name">${mat.material_name}</div>
+            <div class="res-mat-meta">${mat.category}　·　年採購 ${mat.annual_qty.toLocaleString()} ${mat.unit}　·　基準供應商：${baseline.name}</div>
+          </div>
+        </div>
+        <div class="res-baseline-row">
+          <div class="res-baseline-left">
+            <span class="res-baseline-tag-row">📌 現況基準</span>
+            <div class="res-sup-name" style="font-size:13px;margin-top:4px;">${baseline.name}</div>
+            <div class="res-sup-meta">碳排強度 ${baseline.co2_intensity} tCO₂e/${mat.unit}</div>
+          </div>
+          <div class="res-baseline-body">
+            <div class="res-baseline-kpi">
+              <div class="res-baseline-kpi-label">年碳排量</div>
+              <div class="res-baseline-kpi-val">${fmtN(baseAnnualCO2)} <span>tCO₂e</span></div>
+            </div>
+            <div class="res-baseline-divider"></div>
+            <div class="res-baseline-cost-group">
+              <div class="res-baseline-cost-label">年碳調整後採購總成本（採購金額 + 排放量 × 影子價格）</div>
+              <div class="res-baseline-costs">
+                <div class="res-baseline-cost-item">
+                  <span class="scenario-label orig">原始</span>
+                  <span class="res-baseline-cost-num neutral">NT$ ${fmtWan(baseline.unit_price*mat.annual_qty)} 萬</span>
+                </div>
+                <div class="res-baseline-cost-item">
+                  <span class="scenario-label stable">穩健</span>
+                  <span class="res-baseline-cost-num danger">NT$ ${fmtWan(baseline.unit_price*mat.annual_qty + baseHiddenCostStable)} 萬</span>
+                </div>
+                <div class="res-baseline-cost-item">
+                  <span class="scenario-label aggr">積極</span>
+                  <span class="res-baseline-cost-num danger">NT$ ${fmtWan(baseline.unit_price*mat.annual_qty + baseHiddenCostAggr)} 萬</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      nonBase.forEach(sup => {
+        const ms = calcMetricsForSupplier(mat, sup, sp);
+        const ma = calcMetricsForSupplier(mat, sup, ap);
+        const passSm = passFn(ms);
+        const passAg = passFn(ma);
+
+        const metricCell = (label, orig, adjS, adjA, lowerBetter, isNPV=false) => {
+          const colorS = metricPassColor(adjS, label);
+          const colorA = metricPassColor(adjA, label);
+          return `<div class="res-metric-cell">
+            <div class="res-metric-label">${label}</div>
+            <div class="res-metric-row">
+              <div class="res-scenario-block">
+                <span class="scenario-label orig">原始</span>
+                <span class="res-num">${fmt(orig, isNPV)}</span>
+              </div>
+              <div class="res-scenario-block">
+                <span class="scenario-label stable">穩健</span>
+                <span class="res-num" style="color:${colorS};font-weight:700;">${fmt(adjS, isNPV)}</span>
+              </div>
+              <div class="res-scenario-block">
+                <span class="scenario-label aggr">積極</span>
+                <span class="res-num" style="color:${colorA};font-weight:700;">${fmt(adjA, isNPV)}</span>
+              </div>
+            </div>
+          </div>`;
+        };
+
+        const metricsHtml = [
+          state.criteria.payback ? metricCell('回收年限 (年)', ms.payback_orig, ms.payback_adj, ma.payback_adj, true,  false) : '',
+          state.criteria.npv    ? metricCell('NPV (萬元)',    ms.npv_orig,     ms.npv_adj,     ma.npv_adj,     false, true)  : '',
+          state.criteria.bcr    ? metricCell('本益比',          ms.bcr_orig,     ms.bcr_adj,     ma.bcr_adj,     false, false) : '',
+        ].filter(Boolean).join('');
+
+        const premiumWan  = fmtWan(ms.purchasePremium);
+        const premiumSign = ms.purchasePremium >= 0 ? '+' : '';
+        const deltaOrigWan = fmtWan(ms.deltaOrig);
+        const deltaAdjWan  = fmtWan(ms.deltaAdj);
+        const deltaAggrWan = fmtWan(ma.deltaAdj);
+        html += `<div class="res-sup-row">
+          <div class="res-sup-info">
+            <div class="res-sup-name">${sup.name}</div>
+            <div class="res-sup-meta">
+              合約 ${sup.contract_years} 年　·　碳排 ${sup.co2_intensity} tCO₂e/${mat.unit}
+            </div>
+            <div class="res-carbon-row">
+              <span class="res-co2-chip">年減碳 <strong>${fmtN(ms.co2)}</strong> t</span>
+              <span class="res-premium-chip ${ms.purchasePremium>0?'neg':'pos'}">採購溢價 ${premiumSign}${premiumWan} 萬/年</span>
+            </div>
+            <div class="res-carbon-row" style="margin-top:3px;">
+              <span class="res-sup-meta" style="font-size:11px;">年總成本差（vs 基準）：
+                原始 <strong style="color:${ms.deltaOrig<=0?'#2d7a1a':'#c0392b'}">${ms.deltaOrig<=0?'':'+'}${deltaOrigWan}萬</strong>　
+                穩健 <strong style="color:${ms.deltaAdj<=0?'#2d7a1a':'#c0392b'}">${ms.deltaAdj<=0?'':'+'}${deltaAdjWan}萬</strong>　
+                積極 <strong style="color:${ma.deltaAdj<=0?'#2d7a1a':'#c0392b'}">${ma.deltaAdj<=0?'':'+'}${deltaAggrWan}萬</strong>
+              </span>
+            </div>
+          </div>
+          <div class="res-metrics-wrap">${metricsHtml}</div>
+        </div>`;
+      });
+
+      html += `</div>`;
+    });
+
+  } else {
+    activeInvs.forEach(inv => {
+      const ms = calcMetrics(inv, sp);
+      const ma = calcMetrics(inv, ap);
+      if (!ms || !ma) return;
+      const passSm = passFn(ms);
+      const passAg = passFn(ma);
+
+      const metricCell = (label, orig, adjS, adjA, lowerBetter, isNPV=false) => {
+        const colorS = metricPassColor(adjS, label);
+        const colorA = metricPassColor(adjA, label);
+        return `<div class="res-metric-cell">
+          <div class="res-metric-label">${label}</div>
+          <div class="res-metric-row">
+            <div class="res-scenario-block">
+              <span class="scenario-label orig">原始</span>
+              <span class="res-num">${fmt(orig, isNPV)}</span>
+            </div>
+            <div class="res-scenario-block">
+              <span class="scenario-label stable">穩健</span>
+              <span class="res-num" style="color:${colorS};font-weight:700;">${fmt(adjS, isNPV)}</span>
+            </div>
+            <div class="res-scenario-block">
+              <span class="scenario-label aggr">積極</span>
+              <span class="res-num" style="color:${colorA};font-weight:700;">${fmt(adjA, isNPV)}</span>
+            </div>
+          </div>
+        </div>`;
+      };
+
+      const metricsHtml = [
+        state.criteria.payback ? metricCell('回收年限 (年)', ms.payback_orig, ms.payback_adj, ma.payback_adj, true,  false) : '',
+        state.criteria.npv    ? metricCell('NPV (萬元)',    ms.npv_orig,     ms.npv_adj,     ma.npv_adj,     false, true)  : '',
+        state.criteria.bcr    ? metricCell('本益比',          ms.bcr_orig,     ms.bcr_adj,     ma.bcr_adj,     false, false) : '',
+      ].filter(Boolean).join('');
+
+      const isDS = ms._isDownstream;
+
+      if (isDS) {
+        // Downstream: show profit erosion table instead of standard metrics
+        const profitOrig  = ms.annualProfitOrig;
+        const profitStable= ms.annualProfitAdj;
+        const profitAggr  = ma.annualProfitAdj;
+        const deltaStable = ms.profitDelta;
+        const deltaAggr   = ma.profitDelta;
+        html += `<div class="res-mat-group">
+          <div class="res-mat-header" style="background:#1b475d;">
+            <span class="res-mat-icon">📦</span>
+            <div>
+              <div class="res-mat-name">${inv.name}</div>
+              <div class="res-mat-meta">${inv.category}　·　年銷 ${inv.annual_sales.toLocaleString()} 單位　·　${fmtN(ms.emTCO2,3)} tCO₂e/單位　·　年碳排 ${fmtN(ms.co2,0)} t</div>
+            </div>
+          </div>
+          <div class="ds-profit-grid">
+            <div class="ds-profit-cell ds-orig">
+              <div class="ds-cell-label"><span class="scenario-label orig">原始</span>（影子價格 = 0）</div>
+              <div class="ds-kpi-row">
+                <div class="ds-kpi"><div class="ds-kpi-label">年利潤</div><div class="ds-kpi-val">${fmtWan(profitOrig)} 萬</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">回收年限</div><div class="ds-kpi-val">${fmt(ms.payback_orig)} 年</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">NPV</div><div class="ds-kpi-val">${fmtWan(ms.npv_orig)} 萬</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">本益比</div><div class="ds-kpi-val">${fmt(ms.bcr_orig)}</div></div>
+              </div>
+              <div class="ds-cell-sub">碳成本/單位 NT$ 0　·　研發投資 NT$ ${fmtWan(ms.rdCost)} 萬</div>
+            </div>
+            <div class="ds-profit-cell ds-stable">
+              <div class="ds-cell-label"><span class="scenario-label stable">穩健</span>（NT$ ${sp.toLocaleString()} / 噸）</div>
+              <div class="ds-kpi-row">
+                <div class="ds-kpi"><div class="ds-kpi-label">年利潤</div><div class="ds-kpi-val ${profitStable<profitOrig?'ds-worse':''}">${fmtWan(profitStable)} 萬</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">回收年限</div><div class="ds-kpi-val" style="color:${metricPassColor(ms.payback_adj,'回收年限 (年)')}">${fmt(ms.payback_adj)} 年</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">NPV</div><div class="ds-kpi-val" style="color:${metricPassColor(ms.npv_adj,'NPV (萬元)')}">${fmtWan(ms.npv_adj)} 萬</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">本益比</div><div class="ds-kpi-val" style="color:${metricPassColor(ms.bcr_adj,'本益比')}">${fmt(ms.bcr_adj)}</div></div>
+              </div>
+              <div class="ds-cell-sub ds-delta">年利潤差：<strong style="color:${deltaStable>=0?'#2d7a1a':'#c0392b'}">${deltaStable>=0?'+':''}${fmtWan(deltaStable)} 萬</strong>　碳成本/單位 NT$ ${fmtN(ms.carbonCostPerUnit,0)}</div>
+            </div>
+            <div class="ds-profit-cell ds-aggr">
+              <div class="ds-cell-label"><span class="scenario-label aggr">積極</span>（NT$ ${ap.toLocaleString()} / 噸）</div>
+              <div class="ds-kpi-row">
+                <div class="ds-kpi"><div class="ds-kpi-label">年利潤</div><div class="ds-kpi-val ${profitAggr<profitOrig?'ds-worse':''}">${fmtWan(profitAggr)} 萬</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">回收年限</div><div class="ds-kpi-val" style="color:${metricPassColor(ma.payback_adj,'回收年限 (年)')}">${fmt(ma.payback_adj)} 年</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">NPV</div><div class="ds-kpi-val" style="color:${metricPassColor(ma.npv_adj,'NPV (萬元)')}">${fmtWan(ma.npv_adj)} 萬</div></div>
+                <div class="ds-kpi"><div class="ds-kpi-label">本益比</div><div class="ds-kpi-val" style="color:${metricPassColor(ma.bcr_adj,'本益比')}">${fmt(ma.bcr_adj)}</div></div>
+              </div>
+              <div class="ds-cell-sub ds-delta">年利潤差：<strong style="color:${deltaAggr>=0?'#2d7a1a':'#c0392b'}">${deltaAggr>=0?'+':''}${fmtWan(deltaAggr)} 萬</strong>　碳成本/單位 NT$ ${fmtN(ma.carbonCostPerUnit,0)}</div>
+            </div>
+          </div>
+        </div>`;
+        return; // skip standard metrics rendering for downstream
+      }
+
+      html += `<div class="res-mat-group">
+        <div class="res-sup-row" style="border-radius:var(--card-radius);">
+          <div class="res-sup-info">
+            <div class="res-sup-name" style="font-size:15px;">${inv.name}</div>
+            <div class="res-sup-meta">${inv.category}</div>
+            <div class="res-carbon-row">
+              <span class="res-co2-chip">年減碳 <strong>${fmtN(ms.co2)}</strong> t</span>
+              <span class="res-benefit-chip stable">穩健碳效益 NT$ ${fmtWan(ms.carbonBenefit)} 萬</span>
+              <span class="res-benefit-chip aggr">積極碳效益 NT$ ${fmtWan(ma.carbonBenefit)} 萬</span>
+            </div>
+          </div>
+          <div class="res-metrics-wrap">${metricsHtml}</div>
+
+        </div>
+      </div>`;
+    });
+  }
+
+  document.getElementById('resultsTable').innerHTML = html || '<p style="padding:20px;color:#8ebd9d;">無符合條件的項目</p>';
+}
+
+// ======= GOOGLE SHEETS =======
+async function sendToSheets() {
+  const btn = document.querySelector('.gs-btn');
+  const statusEl = document.getElementById('gsStatus');
+  btn.disabled = true;
+  btn.textContent = '匯出中...';
+  statusEl.style.display = 'block';
+  statusEl.textContent = '正在建立連線...';
+
+  const SHEET_URL = APPS_SCRIPT_URL;
+
+  const activeInvs = state.investments.filter(i => i.active);
+  const sp = state.prices.stable;
+  const ap = state.prices.aggressive;
+
+  const rows = activeInvs.map(inv => {
+    const ms = calcMetrics(inv, sp);
+    const ma = calcMetrics(inv, ap);
+    return {
+      name: inv.name, category: inv.category,
+      cost: inv.cost, benefit: inv.benefit, opex: inv.opex,
+      co2_annual: inv.co2, years: inv.years,
+      stable_price: sp, aggr_price: ap,
+      carbon_benefit_stable: ms.carbonBenefit, carbon_benefit_aggr: ma.carbonBenefit,
+      payback_orig: ms.payback_orig, payback_stable: ms.payback_adj, payback_aggr: ma.payback_adj,
+      npv_orig: ms.npv_orig, npv_stable: ms.npv_adj, npv_aggr: ma.npv_adj,
+      bcr_orig: ms.bcr_orig, bcr_stable: ms.bcr_adj, bcr_aggr: ma.bcr_adj,
+    };
+  });
+
+  const payload = {
+    target: state.target,
+    method: state.method,
+    stable_price: sp,
+    aggr_price: ap,
+    timestamp: new Date().toISOString(),
+    user: currentUser || { email: 'anonymous' },
+    investments: rows
+  };
+
+  if (!SHEET_URL || SHEET_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+    // Demo mode - show what would be sent
+    statusEl.innerHTML = `
+      <strong style="color:#1b475d;">✓ 模擬模式</strong>（尚未設定 Apps Script URL）<br>
+      以下資料將被匯出：<br>
+      <pre style="background:#fff5d2;padding:10px;border-radius:6px;margin-top:8px;font-size:11px;overflow:auto;max-height:200px;">${JSON.stringify(payload, null, 2)}</pre>
+      <br><strong>設定方式：</strong>請將 Apps Script 的網路應用程式 URL 貼入程式碼中的 <code>SHEET_URL</code> 變數。
+    `;
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg> 匯出至 Google Sheets`;
+    return;
+  }
+
+  try {
+    // POST with no-cors: Apps Script doesn't return CORS headers on POST
+    // so we fire-and-forget; assume success if no network error
+    await fetch(SHEET_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    statusEl.innerHTML = `<strong style="color:#2d7a1a;">✓ 已成功送出！資料正在寫入 Google Sheets。</strong>`;
+  } catch (e) {
+    statusEl.innerHTML = `<strong style="color:var(--danger);">✗ 匯出失敗：</strong>${e.message}`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zm4.5 0h-3.41v-1.909h3.41v1.91zm0 3.273h-3.41v-1.91h3.41v1.91zm-4.5 0H7.91v-1.91h3.41v1.91z"/><path d="M14.727 0H3.273A1.636 1.636 0 0 0 1.636 1.636v20.728A1.636 1.636 0 0 0 3.273 24h17.454A1.636 1.636 0 0 0 22.364 22.364V7.636L14.727 0zm4.91 22.364H4.363V1.636h9.273v6H19.636v14.728z"/></svg> 匯出至 Google Sheets`;
+}
+
+
+function toggleHint(id) {
+  const el = document.getElementById(id);
+  const isOpen = el.classList.contains('open');
+  document.querySelectorAll('.hint-popover').forEach(p => p.classList.remove('open'));
+  if (!isOpen) {
+    const btn = el.closest('.hint-btn');
+    const rect = btn.getBoundingClientRect();
+    el.style.top = (rect.top + rect.height/2 - 20) + 'px';
+    el.style.left = (rect.right + 10) + 'px';
+    el.classList.add('open');
+  }
+  event.stopPropagation();
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.hint-popover').forEach(p => p.classList.remove('open'));
+});
+
+
+// ── CUSTOM PRICE REFERENCE ROWS ──
+const customRows = { intl: [], dom: [] };
+let customRowId = 0;
+
+function addCustomRow(side) {
+  const id = ++customRowId;
+  customRows[side].push({ id, label: '自訂參考點', w: 0, cons: 0, aggr: 0 });
+  renderCustomRows(side);
+}
+
+function removeCustomRow(side, id) {
+  customRows[side] = customRows[side].filter(r => r.id !== id);
+  renderCustomRows(side);
+  calcPrices();
+}
+
+function renderCustomRows(side) {
+  const container = document.getElementById(`${side}_custom_rows`);
+  if (!container) return;
+  container.innerHTML = '';
+  customRows[side].forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'detail-row';
+    div.style.borderBottom = '1px solid rgba(179,189,97,0.35)';
+    div.innerHTML = `
+      <span class="detail-label" style="gap:4px;">
+        <input type="text" value="${row.label}"
+          onchange="customRows['${side}'].find(r=>r.id===${row.id}).label=this.value"
+          style="border:none;border-bottom:1px dashed #b3bd61;background:transparent;
+                 font-size:13px;color:#1b475d;width:100%;padding:2px 0;
+                 font-family:'Noto Sans TC',sans-serif;">
+      </span>
+      <input type="number" value="${row.w}" min="0" max="100"
+        oninput="customRows['${side}'].find(r=>r.id===${row.id}).w=+this.value;calcPrices()">
+      <input type="number" value="${row.cons}"
+        oninput="customRows['${side}'].find(r=>r.id===${row.id}).cons=+this.value;calcPrices()">
+      <input type="number" value="${row.aggr}"
+        oninput="customRows['${side}'].find(r=>r.id===${row.id}).aggr=+this.value;calcPrices()">
+      <button class="remove-btn" onclick="removeCustomRow('${side}',${row.id})" style="grid-column:5;">✕</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+
+// ===== LOGIN =====
+const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';
+let currentUser = null; // { email, inviteCode }
+
+async function doLogin() {
+  const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const code     = document.getElementById('loginCode').value.trim();
+  const errorEl  = document.getElementById('loginError');
+  const btn      = document.getElementById('loginBtn');
+  const emailEl  = document.getElementById('loginEmail');
+  const codeEl   = document.getElementById('loginCode');
+
+  // Clear errors
+  errorEl.classList.remove('show');
+  emailEl.classList.remove('error');
+  codeEl.classList.remove('error');
+
+  if (!email || !code) {
+    if (!email) emailEl.classList.add('error');
+    if (!code)  codeEl.classList.add('error');
+    errorEl.textContent = '請填寫 Email 和邀請碼。';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '驗證中...';
+
+  // Demo mode (no URL set)
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+    // Allow any input in demo mode
+    currentUser = { email, inviteCode: code };
+    onLoginSuccess();
+    btn.disabled = false;
+    btn.textContent = '進入工具';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=login&email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`);
+    const data = await res.json();
+    if (data.ok) {
+      currentUser = { email, inviteCode: code, name: data.name || '' };
+      onLoginSuccess();
+    } else {
+      emailEl.classList.add('error');
+      codeEl.classList.add('error');
+      errorEl.textContent = data.message || 'Email 或邀請碼不正確，請確認後重試。';
+      errorEl.classList.add('show');
+    }
+  } catch(e) {
+    errorEl.textContent = '連線失敗，請稍後再試。';
+    errorEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '進入工具';
+}
+
+function onLoginSuccess() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  // Show user info in header if desired
+  const headerEl = document.querySelector('.header-title p');
+  if (headerEl && currentUser) {
+    headerEl.textContent = `INTERNAL CARBON PRICING · SHADOW PRICE SIMULATOR　｜　${currentUser.email}`;
+  }
+}
+
+// ======= INIT =======
+onSliderChange(70);
+buildInvestmentBlocks();
+</script>
+
+</body>
+</html>
