@@ -2938,13 +2938,69 @@ async function sendToSheets() {
   const sp = state.prices.stable;
   const ap = state.prices.aggressive;
 
+  const ts = new Date().toISOString();
+  const userInfo = currentUser || { email: 'anonymous' };
+
+
+  // ── 預設值對照表（用於標記修改過的欄位）──
+  const FIELD_DEFAULTS = {
+    payback_threshold: 7, discount_rate: 8, bcr_threshold: 1.0,
+    intl_weight_slider: 70,
+    w_tw_scc: 17,  cons_tw_scc: 10,   aggr_tw_scc: 40,
+    w_tw_fee: 50,  cons_tw_fee: 50,   aggr_tw_fee: 300,
+    w_peer_dom: 33, cons_peer_dom: 3000, aggr_peer_dom: 10000,
+    w_scc: 29,     cons_scc: 6000,    aggr_scc: 10000,
+    w_ets: 42,     cons_ets: 3000,    aggr_ets: 3600,
+    w_peer_intl: 29, cons_peer_intl: 625, aggr_peer_intl: 3600
+  };
+  const INV_DEFAULTS_scope12 = {
+    '廠區屋頂太陽能系統':      { cost:8000000, opex:50000,  years:20, co2:280, benefit:960000 },
+    '製程天然氣鍋爐電氣化':    { cost:4500000, opex:80000,  years:12, co2:210, benefit:770000 },
+    '能源管理系統（EMS）導入': { cost:1500000, opex:20000,  years:8,  co2:90,  benefit:280000 },
+    '廠房 LED 照明全面汰換':   { cost:800000,  opex:10000,  years:10, co2:45,  benefit:165000 },
+    '壓縮空氣系統節能改造':    { cost:1200000, opex:15000,  years:8,  co2:55,  benefit:200000 },
+  };
+
+  // ── 讀取 Step 02 決策門檻 ──
+  const getVal = id => parseFloat(document.getElementById(id)?.value);
+  const step02 = {
+    payback_threshold: getVal('payback_threshold'),
+    discount_rate:     getVal('discount_rate'),
+    bcr_threshold:     getVal('bcr_threshold'),
+  };
+  const step02Modified = {};
+  Object.entries(step02).forEach(([k,v]) => {
+    step02Modified[k] = v !== FIELD_DEFAULTS[k];
+  });
+
+  // ── 讀取 Step 04 影子價格權重 ──
+  const priceFields = ['intl_weight_slider','w_tw_scc','cons_tw_scc','aggr_tw_scc',
+    'w_tw_fee','cons_tw_fee','aggr_tw_fee','w_peer_dom','cons_peer_dom','aggr_peer_dom',
+    'w_scc','cons_scc','aggr_scc','w_ets','cons_ets','aggr_ets','w_peer_intl','cons_peer_intl','aggr_peer_intl'];
+  const step04 = {};
+  const step04Modified = {};
+  priceFields.forEach(id => {
+    const v = getVal(id);
+    step04[id] = v;
+    step04Modified[id] = v !== FIELD_DEFAULTS[id];
+  });
+
+  // ── 投資方案（含預設值比對）──
+  const defaultsForTarget = INV_DEFAULTS_scope12;
   const rows = activeInvs.map(inv => {
     const ms = calcMetrics(inv, sp);
     const ma = calcMetrics(inv, ap);
+    const def = defaultsForTarget[inv.name] || {};
     return {
       name: inv.name, category: inv.category,
       cost: inv.cost, benefit: inv.benefit, opex: inv.opex,
       co2_annual: inv.co2, years: inv.years,
+      // 標記哪些欄位被修改過
+      cost_modified:    def.cost    !== undefined && inv.cost    !== def.cost,
+      benefit_modified: def.benefit !== undefined && inv.benefit !== def.benefit,
+      opex_modified:    def.opex    !== undefined && inv.opex    !== def.opex,
+      co2_modified:     def.co2     !== undefined && inv.co2     !== def.co2,
+      years_modified:   def.years   !== undefined && inv.years   !== def.years,
       stable_price: sp, aggr_price: ap,
       carbon_benefit_stable: ms.carbonBenefit, carbon_benefit_aggr: ma.carbonBenefit,
       payback_orig: ms.payback_orig, payback_stable: ms.payback_adj, payback_aggr: ma.payback_adj,
@@ -2953,30 +3009,39 @@ async function sendToSheets() {
     };
   });
 
-  const ts = new Date().toISOString();
-  const userInfo = currentUser || { email: 'anonymous' };
-
+  // ── Payload A：使用者選擇 Step 01-02 ──
   const choicesPayload = {
     type: 'choices',
-    timestamp: ts,
-    user: userInfo,
-    target: state.target,
-    method: state.method,
+    timestamp: ts, user: userInfo,
+    target: state.target, method: state.method,
     criteria: state.criteria,
-    stable_price: sp,
-    aggr_price: ap,
+    stable_price: sp, aggr_price: ap,
     investment_count: activeInvs.length,
-    investment_names: activeInvs.map(i => i.name).join('、')
+    investment_names: activeInvs.map(i => i.name).join('、'),
+    step02, step02Modified
   };
 
+  // ── Payload B：投資方案詳細 Step 03 ──
+  const investPayload = {
+    type: 'investments',
+    timestamp: ts, user: userInfo,
+    target: state.target,
+    investments: rows
+  };
+
+  // ── Payload C：影子價格設定 Step 04 ──
+  const pricePayload = {
+    type: 'prices',
+    timestamp: ts, user: userInfo,
+    step04, step04Modified
+  };
+
+  // ── Payload D：模擬結果 Step 05 ──
   const payload = {
     type: 'results',
-    target: state.target,
-    method: state.method,
-    stable_price: sp,
-    aggr_price: ap,
-    timestamp: ts,
-    user: userInfo,
+    target: state.target, method: state.method,
+    stable_price: sp, aggr_price: ap,
+    timestamp: ts, user: userInfo,
     investments: rows
   };
 
@@ -2996,16 +3061,13 @@ async function sendToSheets() {
   try {
     // POST with no-cors: Apps Script doesn't return CORS headers on POST
     // so we fire-and-forget; assume success if no network error
-    await fetch(SHEET_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(choicesPayload)
-    });
-    await fetch(SHEET_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
-    });
+    for (const p of [choicesPayload, investPayload, pricePayload, payload]) {
+      await fetch(SHEET_URL, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(p)
+      });
+    }
     statusEl.innerHTML = `<strong style="color:#2d7a1a;">✓ 已成功送出！資料正在寫入 Google Sheets。</strong>`;
   } catch (e) {
     statusEl.innerHTML = `<strong style="color:var(--danger);">✗ 匯出失敗：</strong>${e.message}`;
